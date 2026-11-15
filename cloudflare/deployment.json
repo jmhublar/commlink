@@ -115,5 +115,6 @@
   },
   "gpt_access_policy_id": "6de17479-974e-47af-a84a-86784626e2d8",
   "gpt_service_token_id": "c21d38e0-c844-4ce1-aa06-bfba641e3d18",
-  "deployed_commit": "3f307f299522e219198efe38b2fb5c027ffbb110"
+  "deployed_commit": "80493e34169b231fac60172a883a3bff3b7e98f3",
+  "worker_version_id": "6b6588b9-a43d-454f-8b06-a56e5c4cc3b3"
 }

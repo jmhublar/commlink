@@ -94,11 +94,28 @@ reply and Robut acknowledgment independently. A callback 2xx alone is not proof.
 
 ## Remaining acceptance gates, 2026-11-15
 
-- The connected app's tools/events are visible in ChatGPT, but no CommLink tool or
-  native subscription capability is exposed to this already-running local task.
-  The owning Dot must discover the new app and supply its own native callback.
+- The owning Dot now has the connected tools and native `subscribe_to_events`.
+  Its first `link_status({})` failed because the server rejected MCP request
+  `_meta`, which hosts can attach outside the tool's arguments. Commit `80493e3`
+  accepts object-valued request metadata without trusting it as identity or
+  arguments. A metadata-bearing live probe failed with `-32602` before deployment
+  and returned `self: openai`, pending 0 and Grok ready afterward. All 35 tests
+  pass, including tool argument strictness and metadata-bearing event requests.
+  The owning Dot should retry its own OAuth `link_status` to confirm compatibility.
 - Connection-time callback destination validation is not yet implemented/proved;
   the Worker callback-origin allowlist remains empty.
+- A native subscription setup attempt will fail closed with
+  `data.reason: callback_origin_not_approved` and `data.callback_origin` containing
+  only the HTTPS origin. It sends no callback request and stores no subscription.
+  Provide that origin to the operator; never copy the capability path, query or
+  signing secret into the issue. The actual callback host is needed before
+  choosing and verifying the egress transport.
+- Workers global fetch cannot connect directly to an IP; `cf.resolveOverride`
+  is constrained to the operator's zone. Raw TCP sockets can pin a validated IP
+  and preserve the TLS name, but Cloudflare IP ranges are blocked. Do not assume
+  the actual ChatGPT callback is compatible with that route before resolving its
+  observed hostname. The public-only-fetch flag strengthens routing but has not
+  been treated as proof of the explicit connection-time validation contract.
 - The owning Dot's subscription, unprompted fresh-nonce response, and subsequent
   cloud-task launch remain unverified. No Mac watcher, SMS route or polling task
   was installed.
@@ -109,3 +126,6 @@ reply and Robut acknowledgment independently. A callback 2xx alone is not proof.
 - [OpenAI OAuth contract and exact redirect](https://developers.openai.com/plugins/build/auth)
 - [Cloudflare Managed OAuth](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/managed-oauth/)
 - [OpenAI MCP Events lifecycle and callback validation](https://developers.openai.com/plugins/build/mcp-events)
+- [MCP request metadata schema](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/schema/2025-11-25/schema.ts)
+- [Workers direct-IP fetch limitation](https://developers.cloudflare.com/workers/platform/known-issues/#fetch-to-ip-addresses)
+- [Workers TCP socket restrictions](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/#considerations)
