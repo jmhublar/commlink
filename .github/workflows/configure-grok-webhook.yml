@@ -32,7 +32,7 @@ jobs:
           CLOUDFLARE_WORKER_NAME: ${{ vars.CLOUDFLARE_WORKER_NAME }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           GROK_WEBHOOK_URL: ${{ secrets.GROK_WEBHOOK_URL }}
-          GROK_SENDER_KEY: ${{ secrets.GROK_SENDER_KEY }}
+          GROK_SENDER_KEY: ${{ secrets.GROK_SENDER_KEY || secrets.GROK_SENDER_SECRET }}
           GROK_AUTH_HEADER: ${{ vars.GROK_AUTH_HEADER }}
           GROK_AUTH_SCHEME: ${{ vars.GROK_AUTH_SCHEME }}
           GROK_WEBHOOK_ORIGIN: ${{ vars.GROK_WEBHOOK_ORIGIN }}

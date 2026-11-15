@@ -122,6 +122,9 @@ export class GrokWake {
       await response.body?.cancel();
     } catch {/* Never log response bodies, exception text, endpoint or credentials. */}
     this.sql.exec('UPDATE grok_events SET last_http=?,last_error=? WHERE id=?',http||null,http===200?null:http===0?'network_error':'http_error',job.id);
+    // Cooldown belongs to the recipient, including a replacement event created
+    // while this request was in flight. Persist it before the stale-event guard.
+    if(retryAfter>0)this.sql.exec('UPDATE grok_control SET not_before=MAX(not_before,?) WHERE id=1',Date.now()+retryAfter);
     const transient=http===0||http===408||http===425||http===429||http>=500;
     // A permanent failure applies to this credential revision even when receipt
     // and a new message replaced the active event during the request.

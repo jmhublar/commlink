@@ -2,7 +2,7 @@
   "account_id": "32b597c6685caac8796fc167932759d2",
   "worker_name": "commlink-prototype",
   "worker_id": "cdd6e08580d946cfbe332418d71cfe44",
-  "deployment_id": "d18e589e4a674ad0a9370797f24a0315",
+  "deployment_id": "1402a91ff9d1426a8599e657b15cd422",
   "access_app_id": "84582df9-1583-4e5c-b0ec-770708c448d3",
   "access_policy_id": "15c97385-4880-49d2-aa94-f0e2a4e4f67d",
   "robut_access_policy_id": "3b442b88-3aab-4d92-a4a0-010705cc01e1",
@@ -10,7 +10,7 @@
   "identity_provider_id": "e13ece2f-54a4-4052-9892-c7374767484e",
   "mcp_url": "https://commlink-prototype.joshua-m-hublar.workers.dev/mcp",
   "plan": "Workers Free (confirmed by API)",
-  "status": "Deployed; OAuth connection and live wake acceptance pending",
+  "status": "Grok adapter deployed; live webhook returned HTTP 200; nonce reply and Dot event subscription acceptance pending",
   "metadata": {
     "main_module": "worker.js",
     "compatibility_date": "2026-07-30",
@@ -52,6 +52,31 @@
       {
         "type": "inherit",
         "name": "GROK_SENDER_KEY"
+      },
+      {
+        "type": "plain_text",
+        "name": "GROK_ENABLED",
+        "text": "true"
+      },
+      {
+        "type": "plain_text",
+        "name": "GROK_WEBHOOK_ORIGIN",
+        "text": "https://api2.cursor.sh"
+      },
+      {
+        "type": "plain_text",
+        "name": "GROK_AUTH_HEADER",
+        "text": "Authorization"
+      },
+      {
+        "type": "plain_text",
+        "name": "GROK_AUTH_SCHEME",
+        "text": "Bearer"
+      },
+      {
+        "type": "plain_text",
+        "name": "GROK_CONFIG_REVISION",
+        "text": "1"
       }
     ],
     "observability": {
@@ -77,5 +102,6 @@
     "connection_status": "pending OAuth client redirect and login"
   },
   "gpt_access_policy_id": "6de17479-974e-47af-a84a-86784626e2d8",
-  "gpt_service_token_id": "c21d38e0-c844-4ce1-aa06-bfba641e3d18"
+  "gpt_service_token_id": "c21d38e0-c844-4ce1-aa06-bfba641e3d18",
+  "deployed_commit": "f35d530ed6eddffaeb9ab3a0b8786ffb96bb5052"
 }

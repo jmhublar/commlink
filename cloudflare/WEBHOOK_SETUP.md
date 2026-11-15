@@ -34,6 +34,12 @@ bindings are preserved; this lets credentials be provisioned before the contract
 is known. Enabling also requires an explicit origin and revision. Missing/invalid runtime
 configuration prevents egress. The exact origin must match the secret URL.
 
+Joshua's GitHub sender credential is named `GROK_SENDER_SECRET`. The workflow
+accepts that as an alias for `GROK_SENDER_KEY`; if both exist, `GROK_SENDER_KEY`
+takes precedence. The Worker binding remains `GROK_SENDER_KEY`. There is no need
+to copy or expose a credential just to rename it. `CLOUDFLARE_API_TOKEN` is still
+required for a future GitHub workflow run; connector deployment does not need it.
+
 Use environment secrets, not repository-wide secrets. The Cloudflare token is
 used only by CI and is never included in Worker settings. No credentials are
 needed in Linear, chat, committed files or workflow inputs. The token can edit

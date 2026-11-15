@@ -98,6 +98,19 @@ test('Grok permanent failure blocks a replacement event created during the reque
   assert.equal(f.calls.length,1);assert.equal((await f.status()).grok_routine.blocked,true);
 });
 
+test('Grok replacement event preserves recipient cooldown from an older response',async t=>{
+  const f=await fixture(t);f.setStatus(429);f.setRetryAfter('300');let release;f.setBlock(new Promise(r=>{release=r;}));
+  const first=message('openai',900);await f.send(first);const running=f.tick(0);
+  while(!f.calls.length)await new Promise(r=>setTimeout(r,10));
+  await f.tool('robut','ack',{id:first.message_id});await f.send(message('openai',900));
+  const replacement=(await f.status()).grok_routine.active.id;
+  release();await running;f.setBlock(undefined);f.setStatus(200);f.setRetryAfter(undefined);
+  await f.tick(20000);assert.equal(f.calls.length,1,'replacement must respect 300-second server cooldown');
+  assert.equal((await f.status()).grok_routine.active.id,replacement);
+  await f.tick(279000);assert.equal(f.calls.length,1);
+  await f.tick(1000);assert.equal(f.calls.length,2);assert.equal(f.calls[1].event_id,replacement);
+});
+
 test('Grok default deny, recipient revocation and expiry prevent egress and preserve recoverable mail',async t=>{
   for(const patch of [{GROK_ENABLED:'false'},{GROK_WEBHOOK_ORIGIN:'https://other.example'},{GROK_AUTH_SCHEME:'raw'},{IDENTITIES_JSON:JSON.stringify({'sub:openai':'openai'})}])await t.test(JSON.stringify(Object.keys(patch)),async t=>{
     const f=await fixture(t,patch);assert.equal((await f.send(message())).doorbell,'not_configured');await f.tick(0);assert.equal(f.calls.length,0);
