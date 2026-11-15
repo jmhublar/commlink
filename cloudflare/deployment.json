@@ -38,7 +38,7 @@
       {
         "type": "plain_text",
         "name": "IDENTITIES_JSON",
-        "text": "{\"email:hublar@proton.me\":\"openai\",\"common_name:4b54a821b2f848e1021e8611e6cacc53.access\":\"robut\"}"
+        "text": "{\"email:hublar@proton.me\":\"openai\",\"common_name:4b54a821b2f848e1021e8611e6cacc53.access\":\"robut\",\"common_name:cb4a7504232b3dc998eda71143d0bfe2.access\":\"openai\"}"
       },
       {
         "type": "plain_text",
@@ -75,5 +75,7 @@
     "scope": "USER",
     "visibility": "PRIVATE",
     "connection_status": "pending OAuth client redirect and login"
-  }
+  },
+  "gpt_access_policy_id": "6de17479-974e-47af-a84a-86784626e2d8",
+  "gpt_service_token_id": "c21d38e0-c844-4ce1-aa06-bfba641e3d18"
 }
