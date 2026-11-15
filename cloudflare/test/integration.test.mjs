@@ -20,10 +20,21 @@ test('real Worker: authenticated mailbox and durable signed event delivery', {ti
   for(const role of ['openai','openai-other','robut','stranger'])tokens[role]=await new SignJWT({email:`${role}@example.test`}).setProtectedHeader({alg:'RS256',kid:jwk.kid}).setIssuer('https://access.example').setAudience('test-audience').setSubject(role).setIssuedAt().setExpirationTime('1h').sign(privateKey);
   const options={modules:true,scriptPath:'dist/worker.js',compatibilityDate:'2026-07-30',
     log:new Log(LogLevel.WARN),durableObjects:{MAILBOX:{className:'Mailbox',useSQLite:true}},durableObjectsPersist:dir,
-    bindings:{CHANNEL_ID:'test-channel',ACCESS_ISSUER:'https://access.example',ACCESS_AUD:'test-audience',IDENTITIES_JSON:JSON.stringify({'sub:openai':'openai','sub:openai-other':'openai','sub:robut':'robut'}),CALLBACK_ORIGINS_JSON:JSON.stringify(['https://callback.example'])},
+    bindings:{CHANNEL_ID:'test-channel',ACCESS_ISSUER:'https://access.example',ACCESS_AUD:'test-audience',IDENTITIES_JSON:JSON.stringify({'sub:openai':'openai','sub:openai-other':'openai','sub:robut':'robut'}),CALLBACK_ORIGINS_JSON:JSON.stringify(['https://callback.example']),
+      CALLBACK_TRANSPORT_URL:'https://gateway.example/v1/deliver',CALLBACK_ACCESS_CLIENT_ID:'synthetic-gateway-client',CALLBACK_ACCESS_CLIENT_SECRET:'synthetic-gateway-secret'},
     outboundService:async request=>{
-      const url=new URL(request.url);
+      let url=new URL(request.url);
       if(url.href==='https://access.example/cdn-cgi/access/certs')return Response.json({keys:[jwk]});
+      assert.equal(url.href,'https://gateway.example/v1/deliver','no direct callback fetch');
+      assert.equal(request.headers.get('cf-access-client-id'),'synthetic-gateway-client');
+      assert.equal(request.headers.get('cf-access-client-secret'),'synthetic-gateway-secret');
+      const forwarded=await request.json();
+      assert.deepEqual(Object.keys(forwarded).sort(),['body','headers','url']);
+      assert.ok(!JSON.stringify(forwarded).includes('whsec_'),'signing secret stays in mailbox');
+      assert.ok(!JSON.stringify(forwarded).includes('synthetic-gateway-secret'),'gateway credential is not forwarded');
+      request=new Request(forwarded.url,{method:'POST',headers:forwarded.headers,body:forwarded.body});
+      url=new URL(request.url);
+      const transported=async response=>Response.json({status:response.status,body:await response.text()});
       assert.equal(url.origin,'https://callback.example','unexpected external destination');
       assert.equal(request.method,'POST');
       const body=await request.text(),data=JSON.parse(body),headers=request.headers;
@@ -31,9 +42,9 @@ test('real Worker: authenticated mailbox and durable signed event delivery', {ti
       const expected='v1,'+createHmac('sha256',Buffer.from(secret.slice(6),'base64')).update(`${headers.get('webhook-id')}.${headers.get('webhook-timestamp')}.${body}`).digest('base64');
       assert.ok(headers.get('webhook-signature').split(' ').includes(expected),'valid Standard Webhooks signature');
       assert.ok(headers.get('x-mcp-subscription-id').startsWith('sub_'));
-      if(data.type==='verification'){verifications.push({data,headers});if(verificationBarrier)await verificationBarrier;if(redirectChallenge)return new Response(null,{status:302,headers:{Location:'http://127.0.0.1/private'}});return Response.json({challenge:badChallenge?'wrong':data.challenge});}
+      if(data.type==='verification'){verifications.push({data,headers});if(verificationBarrier)await verificationBarrier;if(redirectChallenge)return transported(new Response(null,{status:302,headers:{Location:'http://127.0.0.1/private'}}));return transported(Response.json({challenge:badChallenge?'wrong':data.challenge}));}
       assert.equal(headers.get('webhook-id'),data.eventId);
-      deliveries.push({data,headers,body});return new Response(null,{status:callbackStatus});
+      deliveries.push({data,headers,body});return transported(new Response(null,{status:callbackStatus}));
     }};
   let mf=new Miniflare(options);t.after(async()=>{await mf.dispose();await rm(dir,{recursive:true,force:true});});
   await mf.ready;

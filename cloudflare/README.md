@@ -56,8 +56,11 @@ live acceptance evidence is tracked in HUB-300.
   an outbound delivery. Add only the exact, verified ChatGPT service origin.
 - General user-supplied webhook hosts, IP literals, credentials, non-HTTPS URLs,
   fragments and redirects are rejected. Explicit operator-vetted origins reduce
-  SSRF exposure. DNS/IP pinning at connection time has not been implemented or
-  proved; review that requirement before enabling a live callback origin.
+  SSRF exposure. The source now routes both verification and delivery through
+  the authenticated [Basestar gateway](../docs/plans/hub-300/basestar.md), which
+  pins connection-time DNS/IP/TLS. This is not deployed. It requires
+  `CALLBACK_TRANSPORT_URL`, `CALLBACK_ACCESS_CLIENT_ID` and
+  `CALLBACK_ACCESS_CLIENT_SECRET`; missing configuration fails closed.
 - Payloads are at most 96 KiB, requests at most 128 KiB, and polls at most 50
   messages. Each peer has separate 60/minute buckets for each validated mailbox
   tool and protocol method, plus a 1,000-message unread

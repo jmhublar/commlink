@@ -3,6 +3,38 @@
 Authorized by Joshua in CommLink on 2026-11-15. Linear remains the work ledger.
 Base: deployed main 492170c. Preserve the old relay and all production state.
 
+## Current increment: Basestar callback transport, 2026-11-15
+
+Joshua selected Basestar hosting after the standalone pinned transport passed
+13 tests and a real OpenAI TLS probe. Implement the service, origin JWT
+verification, bounded ingress, Worker integration and an install proposal target
+in CommLink. Keep host-specific manifests/routes under SysOp's existing Flux
+ownership, consistent with the inspected control-plane repository. Do not move code merely
+because the repository question was asked.
+
+Prepare and test locally using synthetic identities. Do not create credentials,
+Access policies, DNS/tunnel routes, NetworkPolicies, cluster permissions or system
+settings without the required action-time confirmation. No administrator prompt
+is needed for this preparation. Keep callback origins empty until the deployed
+transport and its exact access boundary are approved and verified. Do not change
+the shared Hermes TLS interception path, existing services, old relay or paid plan.
+
+Proposed boundary: a new narrowly scoped Access service identity authenticates
+the existing Worker to a gateway at an exact operator-configured HTTPS endpoint.
+The gateway verifies Access signature, issuer, its own audience, expiry and exact
+service identity before accepting a signed callback payload. No webhook signing
+secret reaches Basestar. Direct callback TLS retains the validated-address policy.
+
+Verification: negative/positive JWT tests, body/concurrency/time limits, no secret
+forwarding/logging, integration tests for both verification and event delivery,
+and reproducible manifest rendering. Deployment remains a separate gated step:
+verify runtime identity/health, rejected anonymous and wrong-principal access,
+real pinned TLS from the Pod, then signed challenge and actual unprompted Dot reply.
+See the concrete [Basestar chart/tunnel proposal](basestar.md). Source checks:
+40 Worker tests, 19 transport/gateway tests, image smoke and Helm lint/render/package.
+The dated original sections below are historical context, superseded by this
+increment and the current deployment/runbook records.
+
 ## State on 2026-11-15
 
 Worker deployed on the existing Workers Free plan with Cloudflare Access Managed

@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels: { app.kubernetes.io/name: commlink-callback, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
+  annotations: { commlink.issue: HUB-300 }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/name: commlink-callback, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: commlink-callback, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
+      annotations: { commlink.issue: HUB-300 }
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 10
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: commlink-callback-hub300
+          image: {{ printf "%s@%s" .Values.image.repository .Values.image.digest | quote }}
+          imagePullPolicy: IfNotPresent
+          ports: [{ name: http, containerPort: 8080 }]
+          env:
+            - { name: COMMLINK_GATEWAY_HOST, value: "0.0.0.0" }
+            - { name: COMMLINK_GATEWAY_ISSUER, value: {{ .Values.access.issuer | quote }} }
+            - { name: COMMLINK_GATEWAY_AUDIENCE, value: {{ .Values.access.audience | quote }} }
+            - { name: COMMLINK_GATEWAY_SERVICE_ID, value: {{ .Values.access.serviceId | quote }} }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+          readinessProbe: { httpGet: { path: /healthz, port: http }, initialDelaySeconds: 2, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, initialDelaySeconds: 10, periodSeconds: 20 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  selector: { app.kubernetes.io/name: commlink-callback, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: commlink-callback, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ .Values.cloudflared.namespace | quote }} }
+          podSelector:
+            matchLabels:
+{{ toYaml .Values.cloudflared.podLabels | indent 14 }}
+      ports: [{ protocol: TCP, port: 8080 }]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.0.0.0/24, 192.0.2.0/24, 192.31.196.0/24, 192.52.193.0/24, 192.88.99.0/24, 192.168.0.0/16, 192.175.48.0/24, 198.18.0.0/15, 198.51.100.0/24, 203.0.113.0/24, 224.0.0.0/4, 240.0.0.0/4]
+        - ipBlock:
+            cidr: 2000::/3
+            except: [2001::/23, "2001:db8::/32", "2002::/16", "2620:4f:8000::/48", "3fff::/20"]
+      ports: [{ protocol: TCP, port: 443 }]

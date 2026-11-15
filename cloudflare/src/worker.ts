@@ -1,10 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { GrokWake, type GrokEnv } from './grok-wake';
+import { callbackPost, type CallbackEnv } from './callback';
 import { EVENT, RpcError, object, exact, string, integer, peer, canonical, sha, equal, signingKey, signature, readBody, envelope, eventDefinition, tools, uuid, type Identity, type ObjectValue, type Peer } from './protocol';
 
 // Configuration is supplied by deployment metadata; no request can select an issuer.
-export interface Env extends GrokEnv {
+export interface Env extends GrokEnv, CallbackEnv {
   MAILBOX: DurableObjectNamespace<Mailbox>;
   CHANNEL_ID: string;
   ACCESS_ISSUER: string;
@@ -51,14 +52,13 @@ function callbackUrl(value:unknown,env:Env):string {
   });
   return url.href;
 }
-async function webhook(url:string,secret:string,id:string,subscription:string,body:string,previous?:string):Promise<Response> {
+async function webhook(env:Env,url:string,secret:string,id:string,subscription:string,body:string,previous?:string):Promise<Response> {
   const time=String(Math.floor(Date.now()/1000));
   let signed=await signature(secret,id,time,body);
   if(previous)signed+=' '+await signature(previous,id,time,body);
-  // workerd supports manual redirect handling; every 3xx is rejected by callers.
-  return fetch(url,{method:'POST',redirect:'manual',signal:AbortSignal.timeout(5000),headers:{
-    'Content-Type':'application/json','webhook-id':id,'webhook-timestamp':time,'webhook-signature':signed,'X-MCP-Subscription-Id':subscription
-  },body});
+  return callbackPost(env,url,{
+    'content-type':'application/json','webhook-id':id,'webhook-timestamp':time,'webhook-signature':signed,'x-mcp-subscription-id':subscription
+  },body);
 }
 
 export class Mailbox extends DurableObject<Env> {
@@ -230,7 +230,7 @@ export class Mailbox extends DurableObject<Env> {
     if(!existing || existing.url!==url || !equal(String(existing.secret),secret) || now-Number(existing.verified)>300000) {
       const challenge=crypto.randomUUID();
       try {
-        const response=await webhook(url,secret,'verify_'+crypto.randomUUID(),subId,JSON.stringify({type:'verification',challenge}));
+        const response=await webhook(this.env,url,secret,'verify_'+crypto.randomUUID(),subId,JSON.stringify({type:'verification',challenge}));
         if(!response.ok)throw new RpcError(-32015,'Callback verification failed',{reason:'challenge_failed'});
         const echoed=object(JSON.parse(await readBody(response,4096))).challenge;
         if(typeof echoed!=='string'||!equal(challenge,echoed))throw new RpcError(-32015,'Callback verification failed',{reason:'challenge_failed'});
@@ -272,7 +272,7 @@ export class Mailbox extends DurableObject<Env> {
       let status=0,error:string|null=null;
       try {
         const url=callbackUrl(sub.url,this.env);
-        const response=await webhook(url,String(sub.secret),String(job.id),String(sub.id),String(job.body),Number(sub.rotation_until)>Date.now()?String(sub.previous_secret):undefined);
+        const response=await webhook(this.env,url,String(sub.secret),String(job.id),String(sub.id),String(job.body),Number(sub.rotation_until)>Date.now()?String(sub.previous_secret):undefined);
         status=response.status;await response.body?.cancel();
       } catch {error='network_or_callback_policy';}
       const attempts=Number(job.attempts)+1;

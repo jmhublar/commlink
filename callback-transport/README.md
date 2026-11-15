@@ -1,13 +1,18 @@
 # Pinned callback transport prototype
 
-This is a standalone Node.js 22+ library and read-only probe for HUB-300. It is
-not wired into the Worker, listening on a port, or deployed. The live callback
-allowlist remains empty. It adds no package dependencies. Do not run this code
-inside Workers' Node compatibility layer: that does not remove the Workers
-socket restrictions. Use an ordinary Node process on a reviewed host/container.
+This Node.js 22+ transport and authenticated gateway implement HUB-300 callback
+pinning. Worker integration, a pinned Node 24 container and a Helm chart are
+prepared in source; none is deployed. The live callback allowlist remains empty.
+The gateway reuses the existing locked jose dependency for Access verification.
+Do not run the transport in Workers' Node compatibility layer: it does not remove
+Workers socket restrictions. Joshua selected Basestar hosting; see the
+[deployment proposal](../docs/plans/hub-300/basestar.md).
 
 ```sh
-node --test callback-transport/transport.test.mjs
+just callback-transport-check
+just callback-image-build
+just callback-image-check
+just callback-chart-package
 node callback-transport/probe.mjs
 ```
 
@@ -55,22 +60,33 @@ the server on validation failure. That shim is absent from the real probe.
 
 ## Verified and remaining
 
-All 13 targeted transport tests passed. On 2026-11-15, the unmodified production
+All 19 transport/gateway tests passed; 40 Worker tests pass, including gateway
+failures and durable signed verification/event delivery. On 2026-11-15, the unmodified production
 connector in the probe selected
 `104.18.38.184`, verified `connectors.api.openai.com`, and negotiated TLS 1.3.
 This proves the pinned socket can reach the observed Cloudflare edge from this
 machine. It does not prove connectivity from a future hosting platform, signed
 challenge completion, native subscription creation, or an actual Dot wake.
 
-Before deployment, choose and approve the hosting/authentication boundary. A
-Cloudflare Container can be accessed through a private Worker/DO binding without
-a public forwarding route; it must retain direct outbound TLS, not an HTTPS
-intercept which hands the request back to ordinary Worker fetch. Alternatively,
-Basestar can host an authenticated narrow egress service, with its availability
-becoming a wake dependency. Neither service/auth configuration exists yet.
-Never expose this library as an unauthenticated forwarding endpoint. Bound
-ingress size/concurrency and redact callback capability URLs, signatures and
-bodies at that future service boundary. Do not log raw exceptions.
+The gateway exposes only POST `/v1/deliver` and data-free GET `/healthz`. It
+validates the Access JWT signature, issuer, audience, expiry and exact service
+identity; cookies and unsigned identity headers grant no access. Ingress is
+bounded to 1 MiB, four concurrent operations and 60 admissions/minute. Outbound
+callback payloads retain the transport's 128 KiB limit and five-second deadline.
+It has no request logging and returns fixed errors only. Worker calls use a
+separate service credential and never fall back to direct callback fetch.
 
-See [the route comparison](../docs/plans/hub-300/callback-transport.md) for
-evidence, costs and the remaining approval/testing gates.
+The image smoke test verifies its real entrypoint, UID 1000, Linux process title,
+health, unauthenticated rejection and graceful shutdown with Docker networking
+disabled, no host mounts and a read-only filesystem. Helm lint/template/package
+checks pass. These do not prove real Access/tunnel ingress or Pod egress.
+
+Before deployment, approve the specific Access identity, exact public hostname,
+tunnel route, cluster release/network policy and Worker bindings described in
+the [Basestar runbook](../docs/plans/hub-300/basestar.md). No Keycloak is needed.
+The gateway needs only nonsecret issuer/audience/Client ID settings; its caller's
+secret stays in the Worker and the approved secret store. Never expose an
+unauthenticated forwarding endpoint or log callback URLs, signatures or bodies.
+
+See [the route comparison](../docs/plans/hub-300/callback-transport.md) for the
+managed-runtime investigation and alternatives.

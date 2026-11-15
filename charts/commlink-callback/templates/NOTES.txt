@@ -1,0 +1,5 @@
+HUB-300 callback gateway chart rendered for {{ .Release.Namespace }}/{{ .Release.Name }}.
+This chart creates no public ingress, tunnel, DNS record, Access policy or credential.
+The Service is ClusterIP only. Origin JWT verification requires its own Access
+audience and exact service ID. Provision the approved public route separately.
+Readiness is process health, not proof of callback delivery or automatic Dot wake.

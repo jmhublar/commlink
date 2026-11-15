@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["image", "access"],
+  "properties": {
+    "image": {"type":"object","required":["repository","digest"],"properties":{
+      "repository":{"type":"string","minLength":1,"pattern":"^[a-zA-Z0-9./:_-]+$"},
+      "digest":{"type":"string","pattern":"^sha256:[a-f0-9]{64}$"}}},
+    "access": {"type":"object","required":["issuer","audience","serviceId"],"properties":{
+      "issuer":{"type":"string","pattern":"^https://[a-z0-9-]+\\.cloudflareaccess\\.com$"},
+      "audience":{"type":"string","minLength":1},
+      "serviceId":{"type":"string","minLength":1}}}
+  }
+}

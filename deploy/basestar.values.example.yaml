@@ -1,0 +1,12 @@
+# Proposal only. Replace these placeholders with approved, verified nonsecret values.
+# Actual service credentials belong in the Worker/1Password, not in this file.
+image:
+  repository: k3d-cogignition-registry:5111/commlink-callback
+  digest: REPLACE_WITH_REVIEWED_IMAGE_DIGEST
+access:
+  issuer: https://cogignition.cloudflareaccess.com
+  audience: REPLACE_WITH_NEW_GATEWAY_APP_AUDIENCE
+  serviceId: REPLACE_WITH_NEW_WORKER_TO_GATEWAY_CLIENT_ID
+cloudflared:
+  namespace: cloudflared
+  podLabels: { app: cloudflared }

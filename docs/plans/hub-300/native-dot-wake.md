@@ -86,9 +86,9 @@ origin and connection-time destination IP, retain TLS verification for the
 original host, reject redirects, and complete the signed challenge before enabling
 application delivery. The prototype currently has an empty callback allowlist.
 Its exact-origin check is implemented, but connection-time IP validation/pinning
-is not wired into the live Worker. A standalone Node transport now passes 13
-tests and a real-origin pinned TLS probe. See the [transport comparison](callback-transport.md)
-for deployment options and approval gates. Do not enable arbitrary callbacks to
+is not wired into the live Worker. The Basestar gateway and Worker integration are prepared in source with
+19 gateway/transport and 40 Worker tests passing, plus a host-level pinned TLS
+probe. See the [Basestar deployment proposal](basestar.md) for exact approval gates. Do not enable arbitrary callbacks to
 get past this.
 
 Test using a fresh Robut-originated nonce, with no manual prompt/poll triggering
@@ -107,7 +107,7 @@ reply and Robut acknowledgment independently. A callback 2xx alone is not proof.
   The owning Dot confirmed its own OAuth status now succeeds: `self: openai`,
   pending 0, no subscriptions and Grok ready.
 - Connection-time callback destination validation is implemented/tested in the
-  standalone Node prototype, not deployed/integrated with the Worker. The live
+  Basestar gateway with Worker integration in source; neither is deployed. The live
   callback-origin allowlist remains empty; no exception is active.
 - The owning Dot made one native setup attempt. The host returned a generic task
   service error with no callback origin, and subsequent host/task and mailbox
@@ -131,8 +131,8 @@ reply and Robut acknowledgment independently. A callback 2xx alone is not proof.
   `data.reason: callback_origin_not_approved` and `data.callback_origin` containing
   only the HTTPS origin. It sends no callback request and stores no subscription.
   The actual origin is now known and verified by DNS/TLS. Never copy the callback
-  capability path, query or signing secret into the issue. Hosting approval,
-  authenticated transport integration and a deployed challenge test remain.
+  capability path, query or signing secret into the issue. Basestar is selected. Action-time access/network/deployment approval and a
+  deployed signed-challenge test remain.
 - Workers global fetch cannot connect directly to an IP; `cf.resolveOverride`
   is constrained to the operator's zone. Raw TCP sockets can pin a validated IP
   and preserve the TLS name, but Cloudflare IP ranges are blocked. Do not assume

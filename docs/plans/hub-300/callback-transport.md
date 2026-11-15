@@ -6,37 +6,21 @@ address with original-host TLS verification, rejection of non-public addresses,
 and no redirects for both verification and deliveries. A DNS preflight followed
 by an unrelated hostname fetch is not sufficient. [OpenAI contract](https://developers.openai.com/plugins/build/mcp-events#verify-the-callback).
 
-## Recommendation
+## Selected route
 
-Keep the mailbox, OAuth and Grok adapter on the existing Worker. Use the small
-explicit Node transport for native callbacks unless Cloudflare provides a
-verifiable managed-runtime guarantee that satisfies the complete contract.
-The [local prototype](../../../callback-transport/README.md) implements/tests
-the address/TLS boundary without changing the live Worker or accepting an
-exception. It is deliberately not a hosted forwarding service yet.
+Joshua selected Basestar hosting and requested a Helm chart and proper tunnel.
+Keep mailbox/OAuth/Grok on the existing Worker. CommLink now prepares an
+Access-authenticated gateway, Worker integration, pinned container and Helm chart.
+SysOp should own host-specific release/tunnel configuration. These source changes
+are tested locally but not deployed. **No Keycloak is needed.** See the
+[Basestar evidence, cost comparison and approval plan](basestar.md).
 
-For independence from Basestar uptime, the best concrete Cloudflare route is a
-small on-demand Container reached only through a private Worker/DO binding.
-Containers support direct Internet egress when enabled. Do not install an HTTPS
-intercept for the callback: that would terminate TLS and delegate egress back to
-Worker fetch, losing the property this transport is intended to establish.
-These are documented capabilities, not a completed deployment test.
-[Container egress](https://developers.cloudflare.com/containers/configuration/outbound-traffic/).
-
-The current account is Workers Free. Containers require the $5/month Workers Paid
-plan plus usage; the smallest `lite` instance is 256 MiB/1⁄16 vCPU/2 GB disk.
-Paid includes 25 GiB-hours memory, 375 vCPU-minutes and 200 GB-hours disk monthly.
-Scaling to zero can keep a small callback service within those allowances, but
-$5 is a base fee, not an all-in cap. Cold start plus transport must fit the host's
-subscription timeout, which still needs measurement. No upgrade was made.
-[Current pricing](https://developers.cloudflare.com/containers/platform/pricing/).
-
-If avoiding new hosting spend takes precedence, an ordinary Node service on
-existing Basestar capacity is feasible. It would need a reviewed authenticated
-Worker-to-service route, resource limits and log redaction; it would also make
-native Dot wake depend on Basestar and its network being up. Existing capacity
-and reachability are assumptions here, not newly verified cluster health. No
-Basestar workload, ingress, service identity or tunnel was changed.
+An on-demand Cloudflare Container through a private Worker/DO binding remains an
+alternative if independence from Basestar uptime later takes priority. Direct
+container egress is documented; HTTPS interception would lose the original-host
+TLS boundary. This account's Containers API explicitly requires a Workers Paid
+upgrade, and no upgrade occurred. [Container egress](https://developers.cloudflare.com/containers/configuration/outbound-traffic/),
+[pricing](https://developers.cloudflare.com/containers/platform/pricing/).
 
 ## Alternatives and evidence
 
@@ -47,7 +31,7 @@ Basestar workload, ingress, service identity or tunnel was changed.
 | Worker IP fetch / `resolveOverride` | Direct IP fetch is unsupported; override applies only when URL host and override are in the operator's zone. | Cannot use this for the external OpenAI hostname while retaining the required hostname semantics. |
 | Worker raw TLS sockets | Current callback A/AAAA addresses are all in published Cloudflare ranges; Workers TCP blocks those ranges. | Not viable for this actual callback destination. |
 | Node pinned TLS on Container | Linux runtime/direct egress, private binding possible; local library and real-origin TLS probe pass. | Paid-plan/hosting approval, ingress binding and deployed-network/challenge tests remain. |
-| Same Node transport on Basestar | Standard Node can dial the validated IP while verifying the original hostname. | Avoids a new hosting bill if capacity exists; adds Basestar availability and authenticated ingress requirements. |
+| Same Node transport on Basestar | Standard Node can dial the validated IP while verifying the original hostname. | Selected. Existing capacity/tunnel inspected; authenticated gateway/chart prepared. Deployment approval and Pod/challenge proof remain. |
 
 Managed-runtime evidence is stronger than only the flag name:
 
@@ -77,15 +61,15 @@ used in the prototype.
 
 ## Exact remaining gates
 
-1. Choose/approve a deployment boundary: Cloudflare paid Container/private binding,
-   or Basestar with an authenticated service route. This is a hosting/access
-   decision; approval to investigate is not approval to change those settings.
-2. Implement bounded authenticated ingress and Worker transport integration for
-   both challenge and event delivery. Keep signing keys in the mailbox and retain
-   the existing origin policy, challenge comparison, retries and owner isolation.
-3. Test the pinned probe from that deployed runtime, then approve the exact
-   callback-origin binding and transport wiring at action time. No wildcard,
-   DNS-preflight fallback, TLS bypass or fetch fallback is permitted.
+1. Approve the concrete new Access identity/application, exact tunnel/DNS route,
+   SysOp release and network policy in the [Basestar proposal](basestar.md).
+   Hosting selection authorizes preparation; the parent explicitly requires
+   action-time confirmation for these security/network changes.
+2. Publish/install the reviewed digest and prove real origin authentication,
+   tunnel routing, NetworkPolicy enforcement and pinned TLS from the Pod. Source
+   implementation and synthetic tests do not establish deployed-network proof.
+3. Approve Worker transport settings and exact callback-origin binding only after
+   that proof. No wildcard, TLS bypass, DNS-preflight or direct-fetch fallback.
 4. Let the owning Dot create its native subscription and prove a fresh
    Robut→Dot→Robut nonce exchange without a manual wake/poll. Record subscription,
    signed challenge, callback acceptance, actual Dot execution and reply separately.
