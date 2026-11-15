@@ -3,7 +3,7 @@
 The manual **Configure Grok webhook** workflow copies GitHub environment secrets
 to encrypted bindings on the existing `commlink-prototype` Worker. It updates
 settings only; it does not upload Worker code, create a routine, or send a wake.
-The Grok transport is still pending implementation and contract verification.
+The Grok transport is implemented. Live wake/reply evidence remains a separate acceptance gate.
 
 ## GitHub environment
 
@@ -22,14 +22,17 @@ In **Settings → Environments → commlink-prototype**, Joshua supplies:
 | Secret | `CLOUDFLARE_API_TOKEN` | Cloudflare token with Workers Scripts Edit for the recorded account |
 | Secret | `GROK_WEBHOOK_URL` | Complete routine URL, including any credential in its path/query |
 | Secret | `GROK_SENDER_KEY` | Routine sender key |
-| Variable | `GROK_AUTH_HEADER` | Verified authentication header name |
-| Variable | `GROK_AUTH_SCHEME` | Verified prefix, such as `Bearer`, or `raw` for no prefix |
+| Variable | `GROK_AUTH_HEADER` | `Authorization` (verified vendor contract) |
+| Variable | `GROK_AUTH_SCHEME` | `Bearer` (verified vendor contract) |
+| Variable | `GROK_WEBHOOK_ORIGIN` | `https://api2.cursor.sh` (Joshua confirmed) |
+| Variable | `GROK_ENABLED` | `true` to enable, `false` to pause |
+| Variable | `GROK_CONFIG_REVISION` | Operator revision, initially `1`; bump after fixing a blocked/exhausted transport |
 
 Both webhook secrets are required for each run. Set both auth variables together
-once Grok confirms the actual contract. If both are absent, existing auth
+using the verified values above. If both are absent, existing auth
 bindings are preserved; this lets credentials be provisioned before the contract
-is known. These variable names describe future adapter inputs, not a claim that
-Grok uses Bearer authentication. No defaults are guessed.
+is known. Enabling also requires an explicit origin and revision. Missing/invalid runtime
+configuration prevents egress. The exact origin must match the secret URL.
 
 Use environment secrets, not repository-wide secrets. The Cloudflare token is
 used only by CI and is never included in Worker settings. No credentials are
@@ -67,7 +70,8 @@ gh secret set GROK_SENDER_KEY --repo jmhublar/commlink --env commlink-prototype
    from `deployment.json`.
 5. The final read verifies expected binding names/types and nonsecret variable
    values. Secret values cannot be read back. Success proves configuration was
-   accepted; it does not prove a Grok run, mailbox receipt or reply.
+   accepted; it does not prove a Grok run, mailbox receipt or reply. Enabling the
+   adapter allows subsequent alarms/sends to deliver pending mail.
 
 The workflow serializes its own runs. Avoid simultaneous dashboard changes or
 other deployments: the Cloudflare settings API has no compare-and-swap guard
@@ -89,10 +93,12 @@ commit `.env` / `.dev.vars` files. The script uses Node 24 in CI and no npm pack
 ## What Grok needs to prepare
 
 See the handoff in [HUB-300](https://linear.app/hublar/issue/HUB-300/robut-openai-agent-channel-mcp-over-tailscale)
-and [wake design](../docs/plans/hub-300/grok-wake.md): the routine, verified auth
-header/prefix and response contract, endpoint origin, a distinct authenticated
-Robut mailbox identity, and the scoped routine instructions. Then implement and
-test delivery, coalescing, reconciliation and the fresh-nonce round trip.
+and [wake design](../docs/plans/hub-300/grok-wake.md). The service identities and
+Worker secrets are now provisioned. The vendor auth contract and endpoint origin
+are verified. The adapter has local delivery/coalescing/reconciliation tests;
+prove the enabled routine and fresh-nonce round trip next. Existing Worker secret
+bindings can be inherited during connector deployment without copying them into
+GitHub first. GitHub secrets support later operator-managed rotations.
 
 References: [Cloudflare secrets](https://developers.cloudflare.com/workers/configuration/secrets/),
 [settings API](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/settings/methods/edit/),

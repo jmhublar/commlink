@@ -1,5 +1,41 @@
 # Grok routine wake design
 
+## Implementation update — 2026-11-15
+
+The adapter is implemented in `cloudflare/src/grok-wake.ts`; live acceptance is
+still pending. The [vendor webhook contract](https://docs.x.ai/grok-bot/skills-routines-and-automations#webhooks)
+now specifies `Authorization: Bearer <key>`, JSON POST and **HTTP 200** for an
+accepted/started run. Other 2xx statuses are not accepted by this adapter.
+Joshua supplied the nonsecret origin `https://api2.cursor.sh`; the full routine
+URL and sender key remain encrypted Worker bindings.
+
+The implemented queue coalesces Robut mail, persists before network I/O, preserves
+event IDs across retry/restart, and reconciles unacknowledged mail after 60 seconds
+using new event IDs. There are six attempts per event, at most three event groups
+per oldest unread message/configuration revision, and at least 20 seconds between
+POSTs per channel. Retry-After is bounded at five minutes. A permanent failure
+blocks the credential revision; update settings and bump `GROK_CONFIG_REVISION`
+to resume, then send a fresh message to schedule work. Status exposes exhaustion
+or blocking. A persistent oldest unread message can suppress later wakes after
+the budget is exhausted; poll/recover it or deliberately bump the revision.
+
+`GROK_ENABLED=true`, the exact `GROK_WEBHOOK_ORIGIN`, `Authorization` / `Bearer`
+auth variables and a configuration revision are required. Endpoint credentials,
+fragments, custom ports, IP literals and redirects are rejected. The operator
+approves the exact service origin; connection-time DNS/IP pinning is not claimed.
+Revoking all Robut identities, disabling the adapter or expiring mail prevents
+delivery. `ack` cancels pending work and never creates a wake. The settings
+workflow can provision these nonsecret variables alongside encrypted bindings.
+
+The live acceptance harness is `cloudflare/scripts/live-acceptance.mjs`. It uses
+only the GPT service credential, keeps it in memory, sends a synthetic nonce,
+filters replies by correlation ID and checks the nonce without printing inbox
+bodies. It does not impersonate Robut or manufacture its reply. A separate Dot
+MCP event subscription is still required to prove automatic wake in reverse.
+
+The remaining sections record the design rationale; the contract questions below
+are historical where the verified vendor contract above resolves them.
+
 Reviewed against CommLink (Grok)'s Linear comment `cf76c962-3e2e-4d26-884a-59f4417d5876`
 on 2026-11-15. This is the recommended implementation direction, not a deployed Grok
 adapter or a verified vendor delivery contract.
@@ -85,6 +121,5 @@ message IDs and Linear work state, independently of webhook event IDs.
 6. Duplicate/reordered notices do not duplicate work. Acknowledgments and Robut's
    outgoing messages do not wake Robut. Permanent auth failures stop safely.
 
-Current implementation status: the MCP Events path is implemented and locally
-tested. The Grok adapter, coalescing and reconciliation described here remain
-pending; `link_status.grok_routine` correctly reports `not_configured`.
+Current implementation status: MCP Events and the Grok adapter are implemented
+and locally tested. Live deployment and acceptance evidence are tracked in HUB-300.

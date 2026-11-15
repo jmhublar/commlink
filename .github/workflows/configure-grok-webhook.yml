@@ -35,3 +35,6 @@ jobs:
           GROK_SENDER_KEY: ${{ secrets.GROK_SENDER_KEY }}
           GROK_AUTH_HEADER: ${{ vars.GROK_AUTH_HEADER }}
           GROK_AUTH_SCHEME: ${{ vars.GROK_AUTH_SCHEME }}
+          GROK_WEBHOOK_ORIGIN: ${{ vars.GROK_WEBHOOK_ORIGIN }}
+          GROK_ENABLED: ${{ vars.GROK_ENABLED }}
+          GROK_CONFIG_REVISION: ${{ vars.GROK_CONFIG_REVISION }}

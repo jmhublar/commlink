@@ -48,8 +48,9 @@ plan's existing limits; it does not upgrade the plan or set paid CPU limits.
 
 Grok's routine-webhook proposal, coalescing, reconciliation, and the remaining
 wire-contract questions are recorded in [the Grok wake design](../docs/plans/hub-300/grok-wake.md).
-These are planned behavior; the deployed prototype does not yet implement the
-Grok transport or reconciliation after an accepted callback.
+The separate Grok transport now implements coalescing and reconciliation after
+an accepted callback. It is disabled unless explicit configuration is complete;
+live acceptance evidence is tracked in HUB-300.
 
 - Current callback origin allowlist is empty, so no subscription can yet create
   an outbound delivery. Add only the exact, verified ChatGPT service origin.

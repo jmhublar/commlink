@@ -71,6 +71,7 @@ test('missing, partial, mismatched or malformed configuration fails before any n
   for (const patch of [
     {GROK_SENDER_KEY: ''}, {CLOUDFLARE_API_TOKEN: ''}, {CLOUDFLARE_ACCOUNT_ID: 'b'.repeat(32)},
     {CLOUDFLARE_WORKER_NAME: 'production'}, {GROK_AUTH_HEADER: 'Authorization'},
+    {GROK_ENABLED: 'true'}, {GROK_WEBHOOK_ORIGIN: 'https://other.example.test'},
     {GROK_AUTH_HEADER: 'Bad Header', GROK_AUTH_SCHEME: 'raw'}, {GROK_SENDER_KEY: 'key\nnext'},
     ...['http://routine.example.test', 'https://127.0.0.1', 'https://[::1]', 'https://user:password@example.test',
       'https://routine.example.test/#secret', 'https://routine.example.test:8443', 'bad-url'].map(GROK_WEBHOOK_URL => ({GROK_WEBHOOK_URL})),

@@ -30,9 +30,19 @@ export function readConfiguration(env, target) {
   const header = env.GROK_AUTH_HEADER || '', scheme = env.GROK_AUTH_SCHEME || '';
   if (Boolean(header) !== Boolean(scheme)) fail('Set GROK_AUTH_HEADER and GROK_AUTH_SCHEME together, or omit both.');
   if (header) {
-    if (!tokenPattern.test(header) || !tokenPattern.test(scheme)) fail('Grok auth header and scheme must be HTTP tokens; use raw for no prefix.');
+    if (!tokenPattern.test(header) || !tokenPattern.test(scheme) || header !== 'Authorization' || scheme !== 'Bearer') fail('The verified Grok contract requires Authorization and Bearer.');
     bindings.push({name: 'GROK_AUTH_HEADER', type: 'plain_text', text: header},
       {name: 'GROK_AUTH_SCHEME', type: 'plain_text', text: scheme});
+  }
+  if (env.GROK_ENABLED && !['true', 'false'].includes(env.GROK_ENABLED)) fail('GROK_ENABLED must be true or false.');
+  if (env.GROK_CONFIG_REVISION && !/^[A-Za-z0-9_.-]{1,64}$/.test(env.GROK_CONFIG_REVISION)) fail('Invalid GROK_CONFIG_REVISION.');
+  if (env.GROK_WEBHOOK_ORIGIN) {
+    let origin;try { origin = new URL(env.GROK_WEBHOOK_ORIGIN); } catch { fail('Invalid GROK_WEBHOOK_ORIGIN.'); }
+    if (origin.origin !== env.GROK_WEBHOOK_ORIGIN || origin.origin !== url.origin) fail('GROK_WEBHOOK_ORIGIN must exactly match the secret URL origin.');
+  }
+  if (env.GROK_ENABLED === 'true' && (!header || !env.GROK_WEBHOOK_ORIGIN || !env.GROK_CONFIG_REVISION)) fail('Enabling Grok requires explicit auth, origin and revision variables.');
+  for (const name of ['GROK_ENABLED', 'GROK_WEBHOOK_ORIGIN', 'GROK_CONFIG_REVISION']) {
+    if (env[name]) bindings.push({name, type: 'plain_text', text: env[name]});
   }
   return {
     endpoint: `https://api.cloudflare.com/client/v4/accounts/${target.account_id}/workers/scripts/${target.worker_name}`,
@@ -103,7 +113,7 @@ export async function configureWebhook(env, target, fetcher = fetch) {
     (b.type !== 'plain_text' || a.text === b.text)))) {
     fail('Update was accepted but binding verification failed; inspect the dashboard before rerunning.');
   }
-  return 'Webhook secret bindings configured and binding names/types verified. No wake was sent; the Grok adapter still requires implementation.';
+  return 'Webhook bindings configured and names/types verified. An enabled Worker can now deliver pending mail; this result does not prove a wake or reply.';
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

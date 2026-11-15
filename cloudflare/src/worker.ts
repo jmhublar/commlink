@@ -1,20 +1,16 @@
 import { DurableObject } from 'cloudflare:workers';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { GrokWake, type GrokEnv } from './grok-wake';
 import { EVENT, RpcError, object, exact, string, integer, peer, canonical, sha, equal, signingKey, signature, readBody, envelope, eventDefinition, tools, uuid, type Identity, type ObjectValue, type Peer } from './protocol';
 
 // Configuration is supplied by deployment metadata; no request can select an issuer.
-export interface Env {
+export interface Env extends GrokEnv {
   MAILBOX: DurableObjectNamespace<Mailbox>;
   CHANNEL_ID: string;
   ACCESS_ISSUER: string;
   ACCESS_AUD: string;
   IDENTITIES_JSON: string; // Explicit signed-claim identity -> mailbox principal.
   CALLBACK_ORIGINS_JSON: string; // Operator-vetted exact HTTPS origins only.
-  // Reserved for the planned Grok adapter; provisioning these does not enable it.
-  GROK_WEBHOOK_URL?: string; // Secret binding, including any credential in the URL.
-  GROK_SENDER_KEY?: string; // Secret binding.
-  GROK_AUTH_HEADER?: string;
-  GROK_AUTH_SCHEME?: string; // Confirmed prefix, or "raw" for no prefix.
 }
 type SqlRow = Record<string, SqlStorageValue>;
 const iso=(n:number)=>new Date(n).toISOString();
@@ -62,6 +58,7 @@ async function webhook(url:string,secret:string,id:string,subscription:string,bo
 
 export class Mailbox extends DurableObject<Env> {
   private sql:SqlStorage;
+  private grok:GrokWake;
   constructor(ctx:DurableObjectState,env:Env) {
     super(ctx,env);this.sql=ctx.storage.sql;
     this.sql.exec(`
@@ -72,6 +69,7 @@ export class Mailbox extends DurableObject<Env> {
       CREATE INDEX IF NOT EXISTS pending_delivery ON outbox(status,due);
       CREATE TABLE IF NOT EXISTS limits(key TEXT PRIMARY KEY,count INTEGER NOT NULL,expires INTEGER NOT NULL);
     `);
+    this.grok=new GrokWake(ctx,env);
   }
   private rows(query:string,...params:SqlStorageValue[]):SqlRow[]{return this.sql.exec(query,...params).toArray();}
   private row(query:string,...params:SqlStorageValue[]):SqlRow|undefined{return this.rows(query,...params)[0];}
@@ -149,7 +147,8 @@ export class Mailbox extends DurableObject<Env> {
         const body=JSON.stringify({eventId,name:EVENT,timestamp:iso(now),data:{message_id:e.message_id,correlation_id:e.correlation_id,recipient:e.to,server_seq:seq,issue_id:typeof e.payload.issue_id==='string'?e.payload.issue_id:null},cursor:null});
         this.sql.exec('INSERT INTO outbox(id,sub_id,message_id,body,due) VALUES(?,?,?,?,?)',eventId,sub.id,e.message_id,body,now);
       }
-      return {status:'accepted',message_id:e.message_id,server_seq:seq,expires_at:iso(now+e.ttl*1000),doorbell:subscriptions.length?'queued':'not_configured'};
+      const grokQueued=e.to==='robut'&&this.grok.enqueue();
+      return {status:'accepted',message_id:e.message_id,server_seq:seq,expires_at:iso(now+e.ttl*1000),doorbell:subscriptions.length||grokQueued?'queued':'not_configured'};
     });
   }
   private poll(id:Identity,a:ObjectValue) {
@@ -166,6 +165,7 @@ export class Mailbox extends DurableObject<Env> {
     this.ctx.storage.transactionSync(()=>{
       this.sql.exec('UPDATE messages SET acked=? WHERE id=?',Date.now(),mid);
       this.sql.exec("UPDATE outbox SET status='cancelled',last_error='message_acked' WHERE message_id=? AND status='pending'",mid);
+      if(id.peer==='robut')this.grok.acknowledge();
     });
     return {status:'acked'};
   }
@@ -174,7 +174,7 @@ export class Mailbox extends DurableObject<Env> {
     return {self:id.peer,pending:Number(this.row('SELECT COUNT(*) AS n FROM messages WHERE recipient=? AND acked IS NULL AND expires>?',id.peer,Date.now())!.n),
       subscriptions:this.rows('SELECT id,expires FROM subscriptions WHERE owner=?',id.key),
       deliveries:this.rows('SELECT o.id,o.message_id,o.status,o.attempts,o.last_http,o.last_error FROM outbox o JOIN subscriptions s ON o.sub_id=s.id WHERE s.owner=? ORDER BY o.due DESC LIMIT 30',id.key),
-      grok_routine:'not_configured'};
+      grok_routine:this.grok.status()};
   }
   private async subscriptionIdentity(id:Identity,p:ObjectValue,withSecret:boolean) {
     exact(p,['name','arguments','delivery','cursor','ttlMs'],['name','arguments','delivery']);
@@ -230,6 +230,7 @@ export class Mailbox extends DurableObject<Env> {
   async alarm() {
     // Guard remains persisted if execution is interrupted halfway through an attempt.
     await this.ctx.storage.setAlarm(Date.now()+60000);
+    await this.grok.run();
     const jobs=this.rows("SELECT * FROM outbox WHERE status='pending' AND due<=? ORDER BY due LIMIT 10",Date.now());
     for(const job of jobs) {
       const sub=this.row('SELECT * FROM subscriptions WHERE id=?',job.sub_id);
@@ -259,8 +260,11 @@ export class Mailbox extends DurableObject<Env> {
     // Retain IDs and evidence for seven days after message expiry, then remove together.
     this.sql.exec('DELETE FROM outbox WHERE message_id IN (SELECT id FROM messages WHERE expires<?)',now-7*86400000);
     this.sql.exec('DELETE FROM messages WHERE expires<?',now-7*86400000);
+    this.grok.cleanup();
     const next=this.row("SELECT MIN(t) AS due FROM (SELECT due AS t FROM outbox WHERE status='pending' UNION ALL SELECT expires AS t FROM subscriptions UNION ALL SELECT expires+604800000 AS t FROM messages)")?.due;
-    if(next!==null&&next!==undefined)await this.ctx.storage.setAlarm(Math.max(now+100,Number(next)));
+    const grokNext=this.grok.nextDue();
+    const due=Math.min(next!==null&&next!==undefined?Number(next):Infinity,grokNext??Infinity);
+    if(Number.isFinite(due))await this.ctx.storage.setAlarm(Math.max(now+100,due));
     else await this.ctx.storage.deleteAlarm();
   }
 }
