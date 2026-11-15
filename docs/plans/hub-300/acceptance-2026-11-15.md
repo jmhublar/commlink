@@ -34,7 +34,9 @@ race: replacing an event during an in-flight 429 could discard Retry-After. A
 regression reproduced the extra POST at 20 seconds despite a 300-second cooldown.
 The fix persists that cooldown in recipient control state before the stale-event
 guard. All 34 tests pass after the fix; deployment/review revisions are recorded
-in `cloudflare/deployment.json` and PR #1.
+in `cloudflare/deployment.json` and PR #1. Fix commit `3f307f2` was deployed as
+version `81cff0ad8ed74aadaece273a20273d3e`; the post-deploy authenticated check
+retained the drained event and empty OpenAI inbox.
 
 Webhook URL/key bindings remained encrypted and were inherited, never exported.
 GitHub environment names verified: `GROK_WEBHOOK_URL` and `GROK_SENDER_SECRET`.
