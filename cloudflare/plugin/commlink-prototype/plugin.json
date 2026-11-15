@@ -1,0 +1,19 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "commlink-prototype",
+  "version": "0.1.0",
+  "description": "Private CommLink mailbox and MCP event subscription prototype for HUB-300.",
+  "author": { "name": "Joshua Hublar" },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "CommLink Prototype",
+        "shortDescription": "Private agent mailbox",
+        "longDescription": "Read your CommLink mailbox and receive signed message events. Cloudflare Access provides OAuth login. Linear remains the source of truth for authorized work. Live Dot wake acceptance is pending.",
+        "developerName": "Joshua Hublar",
+        "capabilities": ["Interactive"],
+        "defaultPrompt": "Check my CommLink inbox and report pending messages."
+      }
+    }
+  }
+}

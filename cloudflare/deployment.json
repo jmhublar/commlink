@@ -1,0 +1,69 @@
+{
+  "account_id": "32b597c6685caac8796fc167932759d2",
+  "worker_name": "commlink-prototype",
+  "worker_id": "cdd6e08580d946cfbe332418d71cfe44",
+  "deployment_id": "d18e589e4a674ad0a9370797f24a0315",
+  "access_app_id": "84582df9-1583-4e5c-b0ec-770708c448d3",
+  "access_policy_id": "15c97385-4880-49d2-aa94-f0e2a4e4f67d",
+  "identity_provider_id": "e13ece2f-54a4-4052-9892-c7374767484e",
+  "mcp_url": "https://commlink-prototype.joshua-m-hublar.workers.dev/mcp",
+  "plan": "Workers Free (confirmed by API)",
+  "status": "Deployed; OAuth connection and live wake acceptance pending",
+  "metadata": {
+    "main_module": "worker.js",
+    "compatibility_date": "2026-07-30",
+    "bindings": [
+      {
+        "type": "durable_object_namespace",
+        "name": "MAILBOX",
+        "class_name": "Mailbox"
+      },
+      {
+        "type": "plain_text",
+        "name": "CHANNEL_ID",
+        "text": "hub-300-prototype"
+      },
+      {
+        "type": "plain_text",
+        "name": "ACCESS_ISSUER",
+        "text": "https://cogignition.cloudflareaccess.com"
+      },
+      {
+        "type": "plain_text",
+        "name": "ACCESS_AUD",
+        "text": "049d99676dd181a57bb5d580977368f8b304467399de197105056fb8401ecbb4"
+      },
+      {
+        "type": "plain_text",
+        "name": "IDENTITIES_JSON",
+        "text": "{\"email:hublar@proton.me\":\"openai\"}"
+      },
+      {
+        "type": "plain_text",
+        "name": "CALLBACK_ORIGINS_JSON",
+        "text": "[]"
+      }
+    ],
+    "observability": {
+      "enabled": true,
+      "logs": {
+        "enabled": true,
+        "invocation_logs": false,
+        "head_sampling_rate": 0.1
+      }
+    },
+    "tags": [
+      "commlink",
+      "hub-300",
+      "prototype"
+    ]
+  },
+  "plugin": {
+    "id": "plugins_6af9fc8296c48191aeb72f02476d8fec",
+    "release_id": "pluginrel_6af9fc831120819195d7ac45337ee1d2",
+    "url": "https://chatgpt.com/plugins/plugins_6af9fc8296c48191aeb72f02476d8fec",
+    "scope": "USER",
+    "visibility": "PRIVATE",
+    "connection_status": "pending OAuth client redirect and login"
+  }
+}
