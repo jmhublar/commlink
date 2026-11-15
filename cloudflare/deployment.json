@@ -2,7 +2,7 @@
   "account_id": "32b597c6685caac8796fc167932759d2",
   "worker_name": "commlink-prototype",
   "worker_id": "cdd6e08580d946cfbe332418d71cfe44",
-  "deployment_id": "2ac49941-3d09-4f19-92fc-05c9b6e64c1f",
+  "deployment_id": "604097e5-2042-46a8-b287-f8e276abbf90",
   "access_app_id": "84582df9-1583-4e5c-b0ec-770708c448d3",
   "access_policy_id": "15c97385-4880-49d2-aa94-f0e2a4e4f67d",
   "robut_access_policy_id": "3b442b88-3aab-4d92-a4a0-010705cc01e1",
@@ -115,6 +115,6 @@
   },
   "gpt_access_policy_id": "6de17479-974e-47af-a84a-86784626e2d8",
   "gpt_service_token_id": "c21d38e0-c844-4ce1-aa06-bfba641e3d18",
-  "deployed_commit": "80493e34169b231fac60172a883a3bff3b7e98f3",
-  "worker_version_id": "6b6588b9-a43d-454f-8b06-a56e5c4cc3b3"
+  "deployed_commit": "92edc3b19edf1f6f792e2a0f96f5ba632d549488",
+  "worker_version_id": "0b1e31c4-6a0b-4f11-a127-12e0163cedb2"
 }

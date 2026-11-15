@@ -101,9 +101,27 @@ reply and Robut acknowledgment independently. A callback 2xx alone is not proof.
   arguments. A metadata-bearing live probe failed with `-32602` before deployment
   and returned `self: openai`, pending 0 and Grok ready afterward. All 35 tests
   pass, including tool argument strictness and metadata-bearing event requests.
-  The owning Dot should retry its own OAuth `link_status` to confirm compatibility.
+  The owning Dot confirmed its own OAuth status now succeeds: `self: openai`,
+  pending 0, no subscriptions and Grok ready.
 - Connection-time callback destination validation is not yet implemented/proved;
   the Worker callback-origin allowlist remains empty.
+- The owning Dot made one native setup attempt. The host returned a generic task
+  service error with no callback origin, and subsequent host/task and mailbox
+  checks found no saved task or subscription. No retry has been performed.
+  Worker telemetry queries for the attempt window returned zero matching events.
+  Invocation logs were disabled, application sampling was 10%, and handled
+  protocol rejections were not logged; absence of telemetry does not establish
+  whether the request reached the Worker.
+- Runtime `92edc3b` adds `link_status.last_subscription_attempt`: at most the last
+  authenticated attempt for that exact principal, with timestamp, outcome, error
+  code, categorized reason and approved-format origin only. It excludes full URLs,
+  paths, queries, signing secrets, bodies and metadata. Records older than one day
+  are hidden and removed during alarm cleanup. A runtime restart preserves them;
+  another OAuth/service identity mapped to the same peer cannot read them.
+  This instrumentation cannot reconstruct the earlier failed attempt. For a future
+  authorized attempt, inspect status using the same owning-Dot OAuth connection.
+  A null record means no retained authorized attempt since instrumentation, not
+  proof that no request reached Cloudflare or failed before mailbox dispatch.
 - A native subscription setup attempt will fail closed with
   `data.reason: callback_origin_not_approved` and `data.callback_origin` containing
   only the HTTPS origin. It sends no callback request and stores no subscription.
