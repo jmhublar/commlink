@@ -9,3 +9,6 @@ prototype-check:
 
 prototype-build:
     cd cloudflare && npm run build
+
+callback-transport-check:
+    node --test callback-transport/transport.test.mjs
