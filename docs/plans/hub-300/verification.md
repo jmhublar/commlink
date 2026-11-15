@@ -29,3 +29,7 @@ The local Codex entry `comlink` uses Streamable HTTP and refers to `COMLINK_RELA
 - Establish unattended dispatch to the chosen dot-accessible chat and verify a completed turn after an actual doorbell.
 - Quiesce and transfer the live state, verify the private service route and both authenticated principals, then start and verify the purpose-named jobs.
 - Run all three peer-originated challenges and the missed-bell, duplicate and receiver-restart cases with the two independent participants. Record the dot's observed response separately.
+
+## Basestar release
+
+Staged the native relay release under `~/.local/share/commlink-HUB-300`. The generated launchd plist passed `plutil -lint`. Its actual GUI job status after staging was unloaded. No login item was enrolled. The foreground `just basestar-check` fixture verified the native process name `CommLinkRelay` with libproc, its resolved executable, a healthy loopback HTTP response and authenticated openai MCP identity. It stopped and reaped the exact fixture process. It also verified failure to start without a migrated mailbox, refusal to stop an unrelated program, and removal of a newly created login link after a failed bootstrap. Job ownership, start, stop and recovery are in [the relay runbook](relay-job.md).

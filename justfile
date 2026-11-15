@@ -26,3 +26,17 @@ codex-connect:
 # Verify vendor request contents and credential handling without contacting Grok.
 routine-check:
     uv run --offline --no-cache --no-project tools/test_grok_routine.py
+
+# Prepare a new release with an actual named Mach-O executable and launchd plist.
+[positional-arguments]
+basestar-prepare release runtime:
+    uv run --offline --no-cache --no-project --python 3.13 tools/prepare_basestar.py "$1" "$2"
+
+# Prove the staged native process name and authenticated relay response in a temporary runtime.
+basestar-check:
+    uv run --offline --no-cache --no-project --python 3.13 tools/test_basestar.py
+
+# Inspect, start at login, or stop only the launchd job owned by this staged release.
+[positional-arguments]
+basestar-job action release:
+    uv run --offline --no-cache --no-project --python 3.13 tools/basestar_job.py "$1" "$2"
