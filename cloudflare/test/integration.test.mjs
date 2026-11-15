@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID, randomBytes, createHmac } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Miniflare, Log, LogLevel } from 'miniflare';
@@ -169,5 +169,23 @@ test('real Worker: authenticated mailbox and durable signed event delivery', {ti
     const extra=msg('openai');assert.equal(value(await tool('openai','send',{to:extra.to,msg:extra})).status,'accepted','send retains its own budget');
     const limited=await rpc('openai','tools/call',{name:'ack',arguments:{id:randomUUID()}});
     assert.equal(limited.error?.code,-32029,'ack itself remains capped at 60');
+  });
+  await t.test('refreshes cannot extend cached callback verification indefinitely',async()=>{
+    // Clock control exists only in this test subclass, never in the deployed
+    // Worker. Exercise the real RPC and storage paths without a five-minute wait.
+    const script=await readFile('dist/worker.js','utf8');
+    await mf.setOptions({...options,scriptPath:undefined,script:script+'\nconst realClock=Date.now; export class ClockMailbox extends Mailbox { advanceClock(ms) { Date.now=()=>realClock()+ms; } }',durableObjects:{MAILBOX:{className:'ClockMailbox',useSQLite:true}},bindings:{...options.bindings,CHANNEL_ID:'verification-cache'}});
+    const namespace=await mf.getDurableObjectNamespace('MAILBOX');
+    const clock=namespace.get(namespace.idFromName('verification-cache'));
+    keys.set('/cached','whsec_'+randomBytes(32).toString('base64'));
+    const before=verifications.length;
+    assert.ok((await rpc('openai','events/subscribe',subscription('/cached'))).result?.id);
+    assert.equal(verifications.length,before+1);
+    await clock.advanceClock(240000);
+    assert.ok((await rpc('openai','events/subscribe',subscription('/cached'))).result?.id);
+    assert.equal(verifications.length,before+1,'refresh within five minutes uses cached proof');
+    await clock.advanceClock(360000);
+    assert.ok((await rpc('openai','events/subscribe',subscription('/cached'))).result?.id);
+    assert.equal(verifications.length,before+2,'six-minute-old proof must be reverified despite refresh');
   });
 });

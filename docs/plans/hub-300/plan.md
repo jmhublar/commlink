@@ -24,7 +24,10 @@ bucket across mailbox tools. Both were reproduced by regression tests before
 fixing them. Subscription insertion now re-reads current state and enforces the
 cap in one synchronous transaction after callback verification. Rate limits use
 validated individual tool names; inactive polling-only limit rows are cleaned up.
-The current local suite has 11 passing tests. The deployed revision is still
+The manual pass also found that repeated refreshes renewed the cached callback
+verification timestamp indefinitely. Refresh now preserves the last actual
+verification time; a test-only clock checks refresh at four and six minutes.
+The current local suite has 12 passing tests. The deployed revision is still
 tracked separately in cloudflare/deployment.json until an explicit redeploy.
 
 Grok's latest recommendation is captured in [the routine wake design](grok-wake.md).

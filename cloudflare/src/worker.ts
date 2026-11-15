@@ -190,6 +190,7 @@ export class Mailbox extends DurableObject<Env> {
     const existing=this.row('SELECT * FROM subscriptions WHERE id=?',subId);
     if(!existing && Number(this.row('SELECT COUNT(*) AS n FROM subscriptions WHERE owner=?',id.key)!.n)>=5)throw new RpcError(-32000,'Subscription limit reached');
     const now=Date.now();
+    let verified=Number(existing?.verified??0);
     if(!existing || existing.url!==url || !equal(String(existing.secret),secret) || now-Number(existing.verified)>300000) {
       const challenge=crypto.randomUUID();
       try {
@@ -197,6 +198,7 @@ export class Mailbox extends DurableObject<Env> {
         if(!response.ok)throw new RpcError(-32015,'Callback verification failed',{reason:'challenge_failed'});
         const echoed=object(JSON.parse(await readBody(response,4096))).challenge;
         if(typeof echoed!=='string'||!equal(challenge,echoed))throw new RpcError(-32015,'Callback verification failed',{reason:'challenge_failed'});
+        verified=Date.now();
       } catch(e) {if(e instanceof RpcError&&e.code===-32015)throw e;throw new RpcError(-32015,'Callback verification failed',{reason:e instanceof Error&&e.name==='TimeoutError'?'timeout':'challenge_failed'});}
     }
     await this.ensureAlarm(now+ttl);
@@ -208,7 +210,8 @@ export class Mailbox extends DurableObject<Env> {
       const committed=Date.now();
       const old=current&&current.secret!==secret?String(current.secret):current?.previous_secret??null;
       const rotation=current&&current.secret!==secret?committed+120000:current?.rotation_until??null;
-      this.sql.exec('INSERT INTO subscriptions(id,owner,peer,url,secret,previous_secret,rotation_until,expires,verified) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET secret=excluded.secret,previous_secret=excluded.previous_secret,rotation_until=excluded.rotation_until,expires=excluded.expires,verified=excluded.verified',subId,id.key,id.peer,url,secret,old,rotation,committed+ttl,committed);
+      // Refreshing expiry does not renew the callback's cached proof of control.
+      this.sql.exec('INSERT INTO subscriptions(id,owner,peer,url,secret,previous_secret,rotation_until,expires,verified) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET secret=excluded.secret,previous_secret=excluded.previous_secret,rotation_until=excluded.rotation_until,expires=excluded.expires,verified=excluded.verified',subId,id.key,id.peer,url,secret,old,rotation,committed+ttl,verified);
       return {id:subId,refreshBefore:iso(committed+ttl),cursor:null,truncated:false};
     });
   }
