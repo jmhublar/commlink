@@ -73,6 +73,7 @@ export class Mailbox extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS outbox(id TEXT PRIMARY KEY,sub_id TEXT NOT NULL,message_id TEXT NOT NULL,body TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending',attempts INTEGER NOT NULL DEFAULT 0,due INTEGER NOT NULL,last_http INTEGER,last_error TEXT);
       CREATE INDEX IF NOT EXISTS pending_delivery ON outbox(status,due);
       CREATE TABLE IF NOT EXISTS limits(key TEXT PRIMARY KEY,count INTEGER NOT NULL,expires INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS subscription_attempts(owner TEXT PRIMARY KEY,attempt_id TEXT NOT NULL,attempted INTEGER NOT NULL,outcome TEXT NOT NULL,code INTEGER,reason TEXT,callback_origin TEXT);
     `);
     this.grok=new GrokWake(ctx,env);
   }
@@ -91,8 +92,29 @@ export class Mailbox extends DurableObject<Env> {
     if(alarm===null || alarm>when)await this.ctx.storage.setAlarm(when);
   }
   async rpc(id:Identity,method:string,params:unknown):Promise<{result?:unknown;error?:{code:number;message:string;data?:ObjectValue}}> {
-    try{return {result:await this.dispatch(id,method,params)};}
-    catch(e){if(e instanceof RpcError)return {error:{code:e.code,message:e.message,...(e.data?{data:e.data}:{})}};throw e;}
+    // One small, owner-scoped record survives generic host errors and log sampling.
+    // Never persist the callback path/query, signing secret, request body or _meta.
+    const attempted=method==='events/subscribe'&&authorized(this.env,id)?crypto.randomUUID():null;
+    if(attempted!==null)this.sql.exec('INSERT INTO subscription_attempts(owner,attempt_id,attempted,outcome) VALUES(?,?,?,?) ON CONFLICT(owner) DO UPDATE SET attempt_id=excluded.attempt_id,attempted=excluded.attempted,outcome=excluded.outcome,code=NULL,reason=NULL,callback_origin=NULL',id.key,attempted,Date.now(),'received');
+    try{
+      const result=await this.dispatch(id,method,params);
+      if(attempted!==null)this.recordSubscriptionAttempt(id,attempted,'accepted');
+      return {result};
+    }catch(e){
+      if(attempted!==null)this.recordSubscriptionAttempt(id,attempted,e instanceof RpcError?'rejected':'internal_error',e);
+      if(e instanceof RpcError)return {error:{code:e.code,message:e.message,...(e.data?{data:e.data}:{})}};throw e;
+    }
+  }
+  private recordSubscriptionAttempt(id:Identity,attempted:string,outcome:string,error?:unknown) {
+    const code=error instanceof RpcError?error.code:null;
+    const reason=error instanceof RpcError&&error.data?.reason==='callback_origin_not_approved'?'callback_origin_not_approved':
+      code===-32602?'invalid_params':code===-32003?'forbidden':code===-32015?'callback_verification_failed':code===-32029?'rate_limited':code===-32000?'limit_reached':error?'internal_error':null;
+    let origin:string|null=null;
+    if(reason==='callback_origin_not_approved'&&error instanceof RpcError&&typeof error.data?.callback_origin==='string'){
+      try{const u=new URL(error.data.callback_origin);if(u.protocol==='https:'&&!u.username&&!u.password)origin=u.origin;}catch{/* Never retain arbitrary error data. */}
+    }
+    // A slow earlier call must not overwrite a newer attempt's diagnostic.
+    this.sql.exec('UPDATE subscription_attempts SET outcome=?,code=?,reason=?,callback_origin=? WHERE owner=? AND attempt_id=?',outcome,code,reason,origin,id.key,attempted);
   }
   private async dispatch(id:Identity,method:string,params:unknown):Promise<unknown> {
     if(!authorized(this.env,id))throw new RpcError(-32003,'Forbidden');
@@ -181,6 +203,7 @@ export class Mailbox extends DurableObject<Env> {
     exact(a,[]);
     return {self:id.peer,pending:Number(this.row('SELECT COUNT(*) AS n FROM messages WHERE recipient=? AND acked IS NULL AND expires>?',id.peer,Date.now())!.n),
       subscriptions:this.rows('SELECT id,expires FROM subscriptions WHERE owner=?',id.key),
+      last_subscription_attempt:this.row('SELECT attempted,outcome,code,reason,callback_origin FROM subscription_attempts WHERE owner=? AND attempted>?',id.key,Date.now()-86400000)??null,
       deliveries:this.rows('SELECT o.id,o.message_id,o.status,o.attempts,o.last_http,o.last_error FROM outbox o JOIN subscriptions s ON o.sub_id=s.id WHERE s.owner=? ORDER BY o.due DESC LIMIT 30',id.key),
       grok_routine:this.grok.status()};
   }
@@ -262,6 +285,7 @@ export class Mailbox extends DurableObject<Env> {
     }
     const now=Date.now();
     this.sql.exec('DELETE FROM limits WHERE expires<?',now);
+    this.sql.exec('DELETE FROM subscription_attempts WHERE attempted<?',now-86400000);
     this.sql.exec("UPDATE outbox SET status='cancelled',last_error='subscription_expired' WHERE status='pending' AND sub_id IN (SELECT id FROM subscriptions WHERE expires<=?)",now);
     this.sql.exec('DELETE FROM subscriptions WHERE expires<=?',now);
     this.sql.exec('UPDATE subscriptions SET previous_secret=NULL,rotation_until=NULL WHERE rotation_until<=?',now);

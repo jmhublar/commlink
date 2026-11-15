@@ -17,10 +17,10 @@ test('real Worker: authenticated mailbox and durable signed event delivery', {ti
   const keys=new Map(); const deliveries=[]; const verifications=[]; let callbackStatus=200,badChallenge=false,redirectChallenge=false;
   let verificationBarrier;
   const tokens={};
-  for(const role of ['openai','robut','stranger'])tokens[role]=await new SignJWT({email:`${role}@example.test`}).setProtectedHeader({alg:'RS256',kid:jwk.kid}).setIssuer('https://access.example').setAudience('test-audience').setSubject(role).setIssuedAt().setExpirationTime('1h').sign(privateKey);
+  for(const role of ['openai','openai-other','robut','stranger'])tokens[role]=await new SignJWT({email:`${role}@example.test`}).setProtectedHeader({alg:'RS256',kid:jwk.kid}).setIssuer('https://access.example').setAudience('test-audience').setSubject(role).setIssuedAt().setExpirationTime('1h').sign(privateKey);
   const options={modules:true,scriptPath:'dist/worker.js',compatibilityDate:'2026-07-30',
     log:new Log(LogLevel.WARN),durableObjects:{MAILBOX:{className:'Mailbox',useSQLite:true}},durableObjectsPersist:dir,
-    bindings:{CHANNEL_ID:'test-channel',ACCESS_ISSUER:'https://access.example',ACCESS_AUD:'test-audience',IDENTITIES_JSON:JSON.stringify({'sub:openai':'openai','sub:robut':'robut'}),CALLBACK_ORIGINS_JSON:JSON.stringify(['https://callback.example'])},
+    bindings:{CHANNEL_ID:'test-channel',ACCESS_ISSUER:'https://access.example',ACCESS_AUD:'test-audience',IDENTITIES_JSON:JSON.stringify({'sub:openai':'openai','sub:openai-other':'openai','sub:robut':'robut'}),CALLBACK_ORIGINS_JSON:JSON.stringify(['https://callback.example'])},
     outboundService:async request=>{
       const url=new URL(request.url);
       if(url.href==='https://access.example/cdn-cgi/access/certs')return Response.json({keys:[jwk]});
@@ -77,8 +77,18 @@ test('real Worker: authenticated mailbox and durable signed event delivery', {ti
     assert.deepEqual(blocked.error?.data,{reason:'callback_origin_not_approved',callback_origin:'https://unapproved.example'});
     assert.ok(!JSON.stringify(blocked).includes('never-echo')&&!JSON.stringify(blocked).includes('private-capability'));
     assert.equal(verifications.length,0,'unapproved origin causes no outbound request');
+    const attempt=value(await tool('openai','link_status')).last_subscription_attempt;
+    assert.equal(attempt.outcome,'rejected');assert.equal(attempt.code,-32602);
+    assert.equal(attempt.reason,'callback_origin_not_approved');assert.equal(attempt.callback_origin,'https://unapproved.example');
+    assert.deepEqual(Object.keys(attempt).sort(),['attempted','callback_origin','code','outcome','reason']);
+    assert.equal(value(await tool('openai-other','link_status')).last_subscription_attempt,null,'same peer, different principal cannot read diagnostic');
+    assert.equal(value(await tool('robut','link_status')).last_subscription_attempt,null,'other peer cannot read diagnostic');
+    await mf.dispose();mf=new Miniflare(options);await mf.ready;
+    assert.deepEqual(value(await tool('openai','link_status')).last_subscription_attempt,attempt,'diagnostic survives runtime restart');
     const malformed=subscription();malformed.delivery.url='not a URL';
     assert.equal((await rpc('openai','events/subscribe',malformed)).error?.code,-32602);
+    const replaced=value(await tool('openai','link_status')).last_subscription_attempt;
+    assert.equal(replaced.reason,'invalid_params');assert.equal(replaced.callback_origin,null,'last attempt replaces old origin');
     assert.equal((await rpc('robut','events/subscribe',subscription())).error.code,-32003);
     const invalid=subscription();invalid.delivery.url='http://127.0.0.1/private';
     assert.equal((await rpc('openai','events/subscribe',invalid)).error.code,-32602);

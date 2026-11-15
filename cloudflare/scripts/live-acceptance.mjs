@@ -30,6 +30,8 @@ try {
   const status=await tool('link_status');if(status.self!=='openai')throw Error();
   const active=status.grok_routine?.active;
   console.log(JSON.stringify({self:status.self,pending:status.pending,subscription_count:status.subscriptions?.length,
+    subscription_diagnostic_supported:Object.hasOwn(status,'last_subscription_attempt'),
+    subscription_diagnostic_present:status.last_subscription_attempt!=null,
     grok_configuration:status.grok_routine?.configuration??'not_configured',blocked:status.grok_routine?.blocked??null,
     wake:active?{id:active.id,status:active.status,attempts:active.attempts,last_http:active.last_http,last_error:active.last_error}:null}));
   if(mode!=='status'){
