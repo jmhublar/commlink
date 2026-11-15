@@ -46,6 +46,11 @@ plan's existing limits; it does not upgrade the plan or set paid CPU limits.
 
 ## Delivery limits and remaining acceptance gates
 
+Grok's routine-webhook proposal, coalescing, reconciliation, and the remaining
+wire-contract questions are recorded in [the Grok wake design](../docs/plans/hub-300/grok-wake.md).
+These are planned behavior; the deployed prototype does not yet implement the
+Grok transport or reconciliation after an accepted callback.
+
 - Current callback origin allowlist is empty, so no subscription can yet create
   an outbound delivery. Add only the exact, verified ChatGPT service origin.
 - General user-supplied webhook hosts, IP literals, credentials, non-HTTPS URLs,
@@ -53,7 +58,8 @@ plan's existing limits; it does not upgrade the plan or set paid CPU limits.
   SSRF exposure. DNS/IP pinning at connection time has not been implemented or
   proved; review that requirement before enabling a live callback origin.
 - Payloads are at most 96 KiB, requests at most 128 KiB, and polls at most 50
-  messages. Each peer has a 60/minute per-method limit and a 1,000-message unread
+  messages. Each peer has separate 60/minute buckets for each validated mailbox
+  tool and protocol method, plus a 1,000-message unread
   limit. A channel is for two peers, not a global multi-tenant coordination point.
 - Subscriptions default to one hour and grant at most one day. Old/new HMAC keys
   overlap for two minutes on rotation. Delivery tries at most six times; 408,

@@ -17,6 +17,21 @@ is needed before enabling DCR. Callback origins remain empty, Robut is not yet
 mapped to a separate machine identity, and no live Dot wake or reply is claimed.
 See [the runbook](../../../cloudflare/README.md).
 
+## PR review cycle — 2026-11-15
+
+The first review found a race in the subscription cap and a shared rate-limit
+bucket across mailbox tools. Both were reproduced by regression tests before
+fixing them. Subscription insertion now re-reads current state and enforces the
+cap in one synchronous transaction after callback verification. Rate limits use
+validated individual tool names; inactive polling-only limit rows are cleaned up.
+The current local suite has 11 passing tests. The deployed revision is still
+tracked separately in cloudflare/deployment.json until an explicit redeploy.
+
+Grok's latest recommendation is captured in [the routine wake design](grok-wake.md).
+It requires a distinct routine adapter, coalescing and reconciliation, rather
+than assuming Grok supports the MCP Events subscription used by Dot. Live
+credentials and the exact routine authentication contract remain unverified.
+
 ## Deliver
 
 - A Worker and one SQLite Durable Object per private two-peer channel.

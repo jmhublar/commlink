@@ -15,6 +15,7 @@ test('real Worker: authenticated mailbox and durable signed event delivery', {ti
   const {publicKey,privateKey}=await generateKeyPair('RS256');
   const jwk={...await exportJWK(publicKey),kid:'test-key',alg:'RS256',use:'sig'};
   const keys=new Map(); const deliveries=[]; const verifications=[]; let callbackStatus=200,badChallenge=false,redirectChallenge=false;
+  let verificationBarrier;
   const tokens={};
   for(const role of ['openai','robut','stranger'])tokens[role]=await new SignJWT({email:`${role}@example.test`}).setProtectedHeader({alg:'RS256',kid:jwk.kid}).setIssuer('https://access.example').setAudience('test-audience').setSubject(role).setIssuedAt().setExpirationTime('1h').sign(privateKey);
   const options={modules:true,scriptPath:'dist/worker.js',compatibilityDate:'2026-07-30',
@@ -30,7 +31,7 @@ test('real Worker: authenticated mailbox and durable signed event delivery', {ti
       const expected='v1,'+createHmac('sha256',Buffer.from(secret.slice(6),'base64')).update(`${headers.get('webhook-id')}.${headers.get('webhook-timestamp')}.${body}`).digest('base64');
       assert.ok(headers.get('webhook-signature').split(' ').includes(expected),'valid Standard Webhooks signature');
       assert.ok(headers.get('x-mcp-subscription-id').startsWith('sub_'));
-      if(data.type==='verification'){verifications.push({data,headers});if(redirectChallenge)return new Response(null,{status:302,headers:{Location:'http://127.0.0.1/private'}});return Response.json({challenge:badChallenge?'wrong':data.challenge});}
+      if(data.type==='verification'){verifications.push({data,headers});if(verificationBarrier)await verificationBarrier;if(redirectChallenge)return new Response(null,{status:302,headers:{Location:'http://127.0.0.1/private'}});return Response.json({challenge:badChallenge?'wrong':data.challenge});}
       assert.equal(headers.get('webhook-id'),data.eventId);
       deliveries.push({data,headers,body});return new Response(null,{status:callbackStatus});
     }};
@@ -134,5 +135,39 @@ test('real Worker: authenticated mailbox and durable signed event delivery', {ti
     const count=deliveries.length,e=msg();await tool('robut','send',{to:e.to,msg:e});await pause(250);
     assert.equal(deliveries.length,count);
     assert.ok(value(await tool('openai','poll',{since:0})).messages.some(x=>x.envelope.message_id===e.message_id));
+  });
+  await t.test('concurrent callback verification cannot exceed the subscription cap',async()=>{
+    await mf.setOptions({...options,bindings:{...options.bindings,CHANNEL_ID:'subscription-cap'}});
+    let release;verificationBarrier=new Promise(resolve=>{release=resolve;});
+    const before=verifications.length;
+    const subscriptions=Array.from({length:6},(_,i)=>{
+      const path=`/cap/${i}`;keys.set(path,'whsec_'+randomBytes(32).toString('base64'));
+      return subscription(path);
+    });
+    const pending=Promise.all(subscriptions.map(s=>rpc('openai','events/subscribe',s)));
+    try{await until(()=>verifications.length===before+6,'all six callbacks must overlap');}
+    finally{release();verificationBarrier=undefined;}
+    const results=await pending;
+    assert.equal(results.filter(r=>r.result?.id).length,5,'exactly five subscriptions commit');
+    assert.equal(results.filter(r=>r.error?.code===-32000).length,1,'sixth is rejected at commit');
+    assert.equal(value(await tool('openai','link_status')).subscriptions.length,5);
+    const refresh=subscriptions[results.findIndex(r=>r.result?.id)];
+    assert.ok((await rpc('openai','events/subscribe',refresh)).result?.id,'refresh at capacity is allowed');
+  });
+  await t.test('mailbox tools have independent rate limits during recovery',async()=>{
+    await mf.setOptions({...options,bindings:{...options.bindings,CHANNEL_ID:'rate-isolation'}});
+    for(let i=0;i<60;i++){
+      const e=msg();assert.equal(value(await tool('robut','send',{to:e.to,msg:e})).status,'accepted');
+    }
+    let since=0;
+    for(let page=0;page<3;page++){
+      const inbox=value(await tool('openai','poll',{since,limit:20}));assert.equal(inbox.messages.length,20);
+      for(const item of inbox.messages)assert.equal(value(await tool('openai','ack',{id:item.envelope.message_id})).status,'acked');
+      since=inbox.next_since;
+    }
+    assert.equal(value(await tool('openai','link_status')).pending,0,'status retains its own budget');
+    const extra=msg('openai');assert.equal(value(await tool('openai','send',{to:extra.to,msg:extra})).status,'accepted','send retains its own budget');
+    const limited=await rpc('openai','tools/call',{name:'ack',arguments:{id:randomUUID()}});
+    assert.equal(limited.error?.code,-32029,'ack itself remains capped at 60');
   });
 });
