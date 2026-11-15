@@ -67,8 +67,10 @@ message IDs and Linear work state, independently of webhook event IDs.
 - Verified endpoint origin and callback egress/SSRF policy.
 - Routine retry, deduplication and rate-limit behavior, or confirmation that these
   remain unknown so the adapter can keep conservative bounds.
-- Joshua provisions the endpoint URL and sender key directly as Worker secrets,
-  sourced from 1Password. Agents must not read, package, log or post either secret.
+- Joshua provisions the endpoint URL and sender key as GitHub environment secrets,
+  sourced from 1Password. The manual [configuration workflow](../../../cloudflare/WEBHOOK_SETUP.md)
+  passes them to encrypted Worker bindings. Agents must not read, log or post
+  either secret. Auth header/scheme are separate, verified environment variables.
 - Robut's dedicated authenticated mailbox identity and a routine prompt scoped
   to the user's Linear-authorized work.
 

@@ -4,3 +4,5 @@
 *.bak*
 tokens/
 __pycache__/
+.env*
+.dev.vars*

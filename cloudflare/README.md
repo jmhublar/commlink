@@ -74,6 +74,11 @@ Grok transport or reconciliation after an accepted callback.
 
 ## Deployment and rollback
 
+Webhook credentials and auth variables can be supplied through the manual
+GitHub environment workflow described in [WEBHOOK_SETUP.md](WEBHOOK_SETUP.md).
+It updates encrypted bindings on the existing Worker; code deployment and the
+Grok wake adapter remain separate steps.
+
 The bundle is `dist/worker.js`. Deployment used the authenticated Cloudflare
 connector API with multipart Worker metadata, a `MAILBOX` SQLite Durable Object
 binding, and one initial migration (`new_tag: v1`, `new_sqlite_classes: [Mailbox]`).

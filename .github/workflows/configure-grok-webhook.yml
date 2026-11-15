@@ -1,0 +1,37 @@
+name: Configure Grok webhook
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commlink-prototype-configuration
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: commlink-prototype
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Test configuration handling without secrets
+        run: node --test cloudflare/test/configure-webhook.test.mjs
+      - name: Apply encrypted webhook bindings
+        run: node cloudflare/scripts/configure-webhook.mjs
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_WORKER_NAME: ${{ vars.CLOUDFLARE_WORKER_NAME }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GROK_WEBHOOK_URL: ${{ secrets.GROK_WEBHOOK_URL }}
+          GROK_SENDER_KEY: ${{ secrets.GROK_SENDER_KEY }}
+          GROK_AUTH_HEADER: ${{ vars.GROK_AUTH_HEADER }}
+          GROK_AUTH_SCHEME: ${{ vars.GROK_AUTH_SCHEME }}

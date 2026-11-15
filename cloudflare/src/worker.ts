@@ -10,6 +10,11 @@ export interface Env {
   ACCESS_AUD: string;
   IDENTITIES_JSON: string; // Explicit signed-claim identity -> mailbox principal.
   CALLBACK_ORIGINS_JSON: string; // Operator-vetted exact HTTPS origins only.
+  // Reserved for the planned Grok adapter; provisioning these does not enable it.
+  GROK_WEBHOOK_URL?: string; // Secret binding, including any credential in the URL.
+  GROK_SENDER_KEY?: string; // Secret binding.
+  GROK_AUTH_HEADER?: string;
+  GROK_AUTH_SCHEME?: string; // Confirmed prefix, or "raw" for no prefix.
 }
 type SqlRow = Record<string, SqlStorageValue>;
 const iso=(n:number)=>new Date(n).toISOString();
