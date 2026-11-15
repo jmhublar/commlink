@@ -40,7 +40,7 @@ cat >"$WDTMP" <<'WD'
 STATE=/home/box/.tailscale/tailscaled.state; MIRROR=/home/box/.tailscale/tailscaled.state.mirror
 SOCK=/var/run/tailscale/tailscaled.sock; LOG=/home/box/.tailscale/watchdog.log
 THRESH=${TS_WD_THRESH:-4}
-start(){ mkdir -p /var/run/tailscale; nohup tailscaled --state="$STATE" --socket="$SOCK" >>/home/box/.tailscale/tailscaled.log 2>&1 & echo "$(date '+%F %T %Z') started tailscaled pid=$!" >>"$LOG"; }
+start(){ mkdir -p /var/run/tailscale; nohup tailscaled --state="$STATE" --statedir=/home/box/.tailscale/var --socket="$SOCK" >>/home/box/.tailscale/tailscaled.log 2>&1 & echo "$(date '+%F %T %Z') started tailscaled pid=$!" >>"$LOG"; }
 mirror(){ [ -s "$STATE" ] || return; if [ ! -s "$MIRROR" ] || ! cmp -s "$STATE" "$MIRROR"; then
   install -m 600 -o box -g box "$STATE" "$MIRROR.tmp" && mv -f "$MIRROR.tmp" "$MIRROR" && echo "$(date '+%F %T %Z') mirrored tailscaled.state" >>"$LOG"; fi; }
 off=0; echo "$(date '+%F %T %Z') watchdog start pid=$$ thresh=$THRESH" >>"$LOG"
@@ -66,7 +66,7 @@ if ! sudo -n test -s "$STATE" && [ -s "$STATE_MIRROR" ]; then
   sudo -n install -m 600 -o root -g root "$STATE_MIRROR" "$STATE" && log "restored tailscaled.state from mirror"
 fi
 # 4. tailscaled + watchdog
-pgrep -x tailscaled >/dev/null || { sudo -n mkdir -p /var/run/tailscale; sudo -n nohup tailscaled --state="$STATE" --socket="$SOCK" >>"$TSDIR/tailscaled.log" 2>&1 & sleep 5; }
+pgrep -x tailscaled >/dev/null || { sudo -n mkdir -p /var/run/tailscale; sudo -n nohup tailscaled --state="$STATE" --statedir=/home/box/.tailscale/var --socket="$SOCK" >>"$TSDIR/tailscaled.log" 2>&1 & sleep 5; }
 pgrep -f /usr/local/sbin/tailscale-watchdog >/dev/null || sudo -n nohup /usr/local/sbin/tailscale-watchdog >/dev/null 2>&1 &
 # 5. login only if needed (a new login registers a NEW node; log loudly when a mirror existed)
 BS=$(sudo -n tailscale status --json 2>/dev/null | python3 -c 'import sys,json;print(json.load(sys.stdin).get("BackendState"))' 2>/dev/null)
