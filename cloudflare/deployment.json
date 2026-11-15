@@ -2,7 +2,7 @@
   "account_id": "32b597c6685caac8796fc167932759d2",
   "worker_name": "commlink-prototype",
   "worker_id": "cdd6e08580d946cfbe332418d71cfe44",
-  "deployment_id": "604097e5-2042-46a8-b287-f8e276abbf90",
+  "deployment_id": "77a313aa-7b8c-4282-8fea-438cfe3f515b",
   "access_app_id": "84582df9-1583-4e5c-b0ec-770708c448d3",
   "access_policy_id": "15c97385-4880-49d2-aa94-f0e2a4e4f67d",
   "robut_access_policy_id": "3b442b88-3aab-4d92-a4a0-010705cc01e1",
@@ -10,7 +10,7 @@
   "identity_provider_id": "e13ece2f-54a4-4052-9892-c7374767484e",
   "mcp_url": "https://commlink-prototype.joshua-m-hublar.workers.dev/mcp",
   "plan": "Workers Free (confirmed by API)",
-  "status": "Grok round trip and ChatGPT OAuth tool/event discovery verified; automatic Dot wake pending callback validation and owning-Dot subscription",
+  "status": "Private Basestar VPC gateway live and health/isolation/pinned TLS verified; exact OpenAI origin enabled; owning-Dot native subscription and wake unproved",
   "metadata": {
     "main_module": "worker.js",
     "compatibility_date": "2026-07-30",
@@ -43,7 +43,7 @@
       {
         "type": "plain_text",
         "name": "CALLBACK_ORIGINS_JSON",
-        "text": "[]"
+        "text": "[\"https://connectors.api.openai.com\"]"
       },
       {
         "type": "inherit",
@@ -77,6 +77,16 @@
         "type": "plain_text",
         "name": "GROK_CONFIG_REVISION",
         "text": "1"
+      },
+      {
+        "name": "CALLBACK_GATEWAY",
+        "type": "vpc_service",
+        "service_id": "01a1e172-f93b-7473-9f9f-3fc83a50d2ed"
+      },
+      {
+        "name": "CALLBACK_TRANSPORT_MODE",
+        "type": "plain_text",
+        "text": "vpc"
       }
     ],
     "observability": {
@@ -115,6 +125,18 @@
   },
   "gpt_access_policy_id": "6de17479-974e-47af-a84a-86784626e2d8",
   "gpt_service_token_id": "c21d38e0-c844-4ce1-aa06-bfba641e3d18",
-  "deployed_commit": "92edc3b19edf1f6f792e2a0f96f5ba632d549488",
-  "worker_version_id": "0b1e31c4-6a0b-4f11-a127-12e0163cedb2"
+  "deployed_commit": "7ca277b9238c08ce3a6e79123874fb1148b29c96",
+  "worker_version_id": "8b283d8f-c5e7-47f2-95bb-e1653dd01b1e",
+  "vpc_gateway": {
+    "service_id": "01a1e172-f93b-7473-9f9f-3fc83a50d2ed",
+    "tunnel_id": "80435c51-39b9-4d55-96fa-2936ff1345ad",
+    "target": "commlink-callback.commlink.svc.cluster.local:8080",
+    "namespace": "commlink",
+    "helm_release": "commlink-callback",
+    "chart_version": "0.2.0",
+    "chart_digest": "sha256:e733b94c89a866708016f594a69006da05607756810ab1b5b916cce232ce2f8a",
+    "image_digest": "sha256:814667b71b35bb950888e722db9d45d5edbc433f11aa0d2eebef07a11104829c",
+    "health_verified": true,
+    "isolation_verified": true
+  }
 }
