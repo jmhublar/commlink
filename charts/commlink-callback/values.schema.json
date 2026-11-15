@@ -1,14 +1,124 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["image", "access"],
+  "required": [
+    "image",
+    "authMode",
+    "cloudflared"
+  ],
   "properties": {
-    "image": {"type":"object","required":["repository","digest"],"properties":{
-      "repository":{"type":"string","minLength":1,"pattern":"^[a-zA-Z0-9./:_-]+$"},
-      "digest":{"type":"string","pattern":"^sha256:[a-f0-9]{64}$"}}},
-    "access": {"type":"object","required":["issuer","audience","serviceId"],"properties":{
-      "issuer":{"type":"string","pattern":"^https://[a-z0-9-]+\\.cloudflareaccess\\.com$"},
-      "audience":{"type":"string","minLength":1},
-      "serviceId":{"type":"string","minLength":1}}}
-  }
+    "image": {
+      "type": "object",
+      "required": [
+        "repository",
+        "digest"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9./:_-]+$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "access": {
+      "type": "object",
+      "properties": {
+        "issuer": {
+          "type": "string"
+        },
+        "audience": {
+          "type": "string"
+        },
+        "serviceId": {
+          "type": "string"
+        }
+      }
+    },
+    "authMode": {
+      "type": "string",
+      "enum": [
+        "access",
+        "vpc-network"
+      ]
+    },
+    "cloudflared": {
+      "type": "object",
+      "required": [
+        "namespace",
+        "podLabels"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "podLabels": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "authMode": {
+            "const": "access"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "access"
+        ],
+        "properties": {
+          "access": {
+            "required": [
+              "issuer",
+              "audience",
+              "serviceId"
+            ],
+            "properties": {
+              "issuer": {
+                "pattern": "^https://[a-z0-9-]+\\.cloudflareaccess\\.com$"
+              },
+              "audience": {
+                "minLength": 1
+              },
+              "serviceId": {
+                "minLength": 1
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "access": {
+            "properties": {
+              "issuer": {
+                "maxLength": 0
+              },
+              "audience": {
+                "maxLength": 0
+              },
+              "serviceId": {
+                "maxLength": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

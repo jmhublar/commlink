@@ -1,6 +1,8 @@
 import { readBody, object, exact, integer } from './protocol';
 
 export interface CallbackEnv {
+  CALLBACK_TRANSPORT_MODE?: string;
+  CALLBACK_GATEWAY?: { fetch(input:RequestInfo|URL,init?:RequestInit):Promise<Response> };
   CALLBACK_TRANSPORT_URL?: string;
   CALLBACK_ACCESS_CLIENT_ID?: string;
   CALLBACK_ACCESS_CLIENT_SECRET?: string;
@@ -9,16 +11,29 @@ export interface CallbackEnv {
 // The operator configures one owned gateway; a callback cannot choose this URL.
 // Both verification and events must use it. There is no direct-fetch fallback.
 export async function callbackPost(env:CallbackEnv,url:string,headers:Record<string,string>,body:string):Promise<Response> {
-  if(!env.CALLBACK_TRANSPORT_URL||!env.CALLBACK_ACCESS_CLIENT_ID||!env.CALLBACK_ACCESS_CLIENT_SECRET)
-    throw new Error('Callback transport not configured');
-  const target=new URL(env.CALLBACK_TRANSPORT_URL);
-  if(target.protocol!=='https:'||target.username||target.password||target.port||target.search||target.hash||
-    target.pathname!=='/v1/deliver'||/^[\d.]+$/.test(target.hostname)||target.hostname.includes(':'))
-    throw new Error('Invalid callback transport configuration');
-  const response=await fetch(target.href,{method:'POST',redirect:'manual',signal:AbortSignal.timeout(10000),headers:{
-    'content-type':'application/json','CF-Access-Client-Id':env.CALLBACK_ACCESS_CLIENT_ID,
-    'CF-Access-Client-Secret':env.CALLBACK_ACCESS_CLIENT_SECRET,
-  },body:JSON.stringify({url,headers,body})});
+  const mode=env.CALLBACK_TRANSPORT_MODE??'access';
+  let response:Response;
+  const requestBody=JSON.stringify({url,headers,body});
+  if(mode==='vpc') {
+    // Authorization is the deployment's fixed VPC Service binding + private
+    // network policy, not request headers. Never use a VPC Network binding here.
+    if(!env.CALLBACK_GATEWAY||env.CALLBACK_TRANSPORT_URL||env.CALLBACK_ACCESS_CLIENT_ID||env.CALLBACK_ACCESS_CLIENT_SECRET)
+      throw new Error('Invalid VPC callback transport configuration');
+    response=await env.CALLBACK_GATEWAY.fetch('http://commlink-callback.commlink.svc.cluster.local:8080/v1/deliver',{
+      method:'POST',redirect:'manual',signal:AbortSignal.timeout(10000),
+      headers:{'content-type':'application/json'},body:requestBody});
+  } else if(mode==='access') {
+    if(env.CALLBACK_GATEWAY||!env.CALLBACK_TRANSPORT_URL||!env.CALLBACK_ACCESS_CLIENT_ID||!env.CALLBACK_ACCESS_CLIENT_SECRET)
+      throw new Error('Callback transport not configured');
+    const target=new URL(env.CALLBACK_TRANSPORT_URL);
+    if(target.protocol!=='https:'||target.username||target.password||target.port||target.search||target.hash||
+      target.pathname!=='/v1/deliver'||/^[\d.]+$/.test(target.hostname)||target.hostname.includes(':'))
+      throw new Error('Invalid callback transport configuration');
+    response=await fetch(target.href,{method:'POST',redirect:'manual',signal:AbortSignal.timeout(10000),headers:{
+      'content-type':'application/json','CF-Access-Client-Id':env.CALLBACK_ACCESS_CLIENT_ID,
+      'CF-Access-Client-Secret':env.CALLBACK_ACCESS_CLIENT_SECRET,
+    },body:requestBody});
+  } else throw new Error('Invalid callback transport mode');
   if(response.status!==200){await response.body?.cancel();throw new Error('Callback transport failed');}
   const result=object(JSON.parse(await readBody(response,32768)));
   exact(result,['status','body']);

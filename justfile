@@ -28,6 +28,8 @@ callback-image-check:
 callback-chart-check:
     helm lint charts/commlink-callback -f charts/commlink-callback/ci/test-values.yaml --strict
     helm template commlink-callback charts/commlink-callback --namespace commlink -f charts/commlink-callback/ci/test-values.yaml > /dev/null
+    helm lint charts/commlink-callback -f charts/commlink-callback/ci/test-values.yaml --set authMode=vpc-network --set access.issuer= --set access.audience= --set access.serviceId= --strict
+    helm template commlink-callback charts/commlink-callback --namespace commlink -f charts/commlink-callback/ci/test-values.yaml --set authMode=vpc-network --set access.issuer= --set access.audience= --set access.serviceId= > /dev/null
 
 # Builds a local release artifact; does not publish or deploy.
 callback-chart-package destination="/tmp/commlink-chart": callback-chart-check

@@ -3,6 +3,10 @@
 This Node.js 22+ transport and authenticated gateway implement HUB-300 callback
 pinning. Worker integration, a pinned Node 24 container and a Helm chart are
 prepared in source; none is deployed. The live callback allowlist remains empty.
+Private Workers VPC mode is now also prepared for exploration, with an explicit
+network trust boundary and no new application credential. It is disabled by
+default. See the [VPC proposal](../docs/plans/hub-300/vpc.md); this supersedes the
+public Access recommendation for the current exploration, not its deployment gate.
 The gateway reuses the existing locked jose dependency for Access verification.
 Do not run the transport in Workers' Node compatibility layer: it does not remove
 Workers socket restrictions. Joshua selected Basestar hosting; see the
@@ -60,7 +64,7 @@ the server on validation failure. That shim is absent from the real probe.
 
 ## Verified and remaining
 
-All 19 transport/gateway tests passed; 40 Worker tests pass, including gateway
+All 22 transport/gateway tests passed; 44 Worker tests pass, including gateway
 failures and durable signed verification/event delivery. On 2026-11-15, the unmodified production
 connector in the probe selected
 `104.18.38.184`, verified `connectors.api.openai.com`, and negotiated TLS 1.3.

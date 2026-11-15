@@ -5,6 +5,13 @@ host. It creates one Deployment, one ClusterIP Service and one NetworkPolicy.
 It does not create a namespace, public ingress, credentials, RBAC, storage or
 Cloudflare resources. Nothing is installed by the check/package/plan targets.
 
+Chart 0.2.0 also prepares explicit `authMode: vpc-network` for private VPC
+exploration. This mode relies on the platform binding, tunnel and NetworkPolicy;
+it does not authenticate an individual Worker through a JWT. Default `access`
+mode still requires issuer/audience/service Client ID. See the
+[VPC proposal and trusted callers](../../docs/plans/hub-300/vpc.md) before choosing
+private mode. Never expose private mode through a public ingress or port forward.
+
 Run from the CommLink repository root:
 
 ```sh
@@ -22,7 +29,7 @@ OrbStack Docker context. The image check is temporary, runs without networking
 or host mounts, and does not publish a port. The image reuses the existing locked
 `jose`/esbuild dependencies; no package download occurs inside the Docker build.
 
-Required values: immutable image repository/digest, Access issuer, this gateway's
+Access mode required values: immutable image repository/digest, Access issuer, this gateway's
 app audience, and the dedicated service token's **Client ID** (`common_name` in
 its signed JWT). Client Secret is never a chart value. Namespace is supplied by
 the installer; proposed Basestar release and namespace are `commlink-callback`

@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { request as httpRequest } from 'node:http';
 import { createGateway } from './dist/gateway.mjs';
 import { generateKeyPair, SignJWT } from '../cloudflare/node_modules/jose/dist/webapi/index.js';
 
@@ -59,5 +60,36 @@ test('origin JWT boundary and bounded gateway protocol', async t => {
     assert.equal((await post()).status, 429);
     release(); block = undefined;
     for (const response of await Promise.all(held)) assert.equal(response.status, 200);
+  });
+});
+
+test('private gateway mode requires explicit deployment configuration and the fixed internal Host', async t => {
+  for(const bad of [{authMode:'other'},{authMode:'vpc-network',...config},{}])
+    assert.throws(()=>createGateway(bad),/invalid_gateway_config/);
+  const delivered=[];
+  const server=createGateway({authMode:'vpc-network'},{transport:{post:async payload=>{
+    delivered.push(payload);return {status:200,body:'synthetic'};
+  }}});
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  t.after(()=>{server.closeAllConnections();server.close();});
+  const url=`http://127.0.0.1:${server.address().port}/v1/deliver`;
+  const post=(host,extra={})=>new Promise((resolve,reject)=>{
+    const req=httpRequest(url,{method:'POST',headers:{'content-type':'application/json',host,...extra}},res=>{
+      res.resume();res.on('end',()=>resolve({status:res.statusCode}));
+    });req.on('error',reject);req.end('{}');
+  });
+  await t.test('public hostname and spoofed identity headers do not select or unlock private mode',async()=>{
+    for(const host of ['commlink-egress.cogignition.cloud','other.internal','commlink-callback.commlink.svc.cluster.local']){
+      assert.equal((await post(host,{'cf-access-jwt-assertion':'forged','x-authenticated-email':'owner@example.test'})).status,403);
+    }
+    assert.equal(delivered.length,0);
+  });
+  await t.test('explicit private mode accepts the fixed Host without inventing a Worker identity',async()=>{
+    const host='commlink-callback.commlink.svc.cluster.local:8080';
+    assert.equal((await post(host)).status,200);
+    assert.deepEqual(delivered,[{}]);
+    assert.equal((await post(host,{origin:'https://browser.example'})).status,400);
+    // This acceptance is intentional: Host is not authentication. Only the live
+    // private VPC configuration and enforced NetworkPolicy can prove isolation.
   });
 });

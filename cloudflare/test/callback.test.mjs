@@ -48,3 +48,35 @@ test('Worker callback transport fails closed with no direct-fetch fallback', asy
     }
   });
 });
+
+test('private VPC transport uses only its fixed service binding', async t => {
+  const calls=[];
+  t.mock.method(globalThis,'fetch',async()=>assert.fail('global fetch must never be used by VPC mode'));
+  let response=()=>Response.json({status:200,body:'synthetic'});
+  const binding={fetch:async(...args)=>{calls.push(args);return response();}};
+  const env={CALLBACK_TRANSPORT_MODE:'vpc',CALLBACK_GATEWAY:binding};
+  await t.test('signed payload uses the fixed internal origin and no Access credentials',async()=>{
+    assert.equal(await (await callbackPost(env,...payload)).text(),'synthetic');
+    const [url,request]=calls.at(-1);
+    assert.equal(url,'http://commlink-callback.commlink.svc.cluster.local:8080/v1/deliver');
+    assert.equal(request.redirect,'manual');
+    assert.deepEqual(request.headers,{'content-type':'application/json'});
+    assert.deepEqual(JSON.parse(request.body),{url:payload[0],headers:payload[1],body:payload[2]});
+  });
+  await t.test('missing binding, unknown mode and mixed public/private settings fail before egress',async()=>{
+    const before=calls.length;
+    for(const bad of [{CALLBACK_TRANSPORT_MODE:'vpc'}, {...env,CALLBACK_TRANSPORT_MODE:'other'},
+      {...env,CALLBACK_ACCESS_CLIENT_SECRET:'forbidden'}, {...env,CALLBACK_ACCESS_CLIENT_ID:'forbidden'},
+      {...env,CALLBACK_TRANSPORT_URL:'https://public.example/v1/deliver'},
+      {...config,CALLBACK_GATEWAY:binding}])await assert.rejects(callbackPost(bad,...payload));
+    assert.equal(calls.length,before);
+  });
+  await t.test('binding errors and redirects never retry using global fetch or public credentials',async()=>{
+    for(const reply of [()=>{throw new Error('synthetic tunnel unavailable');},
+      ()=>new Response(null,{status:302,headers:{Location:'https://public.example'}}),
+      ()=>Response.json({status:302,body:''}), ()=>Response.json({status:200,body:'x'.repeat(4097)})]){
+      response=reply;const before=calls.length;
+      await assert.rejects(callbackPost(env,...payload));assert.equal(calls.length,before+1);
+    }
+  });
+});

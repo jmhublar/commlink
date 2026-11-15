@@ -1,3 +1,4 @@
+authMode: access
 image:
   repository: ""
   digest: ""

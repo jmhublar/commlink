@@ -5,6 +5,12 @@ Base: deployed main 492170c. Preserve the old relay and all production state.
 
 ## Current increment: Basestar callback transport, 2026-11-15
 
+Latest steering: Joshua paused credential creation and requested Workers VPC
+exploration. Prepare source/configuration only, with no live security/network
+changes. The [VPC proposal](vpc.md) records fixed-service routing, private-mode
+trust boundaries, tests and exact later approval actions. The earlier public
+Access/tunnel deployment proposal is an alternative, not currently being applied.
+
 Joshua selected Basestar hosting after the standalone pinned transport passed
 13 tests and a real OpenAI TLS probe. Implement the service, origin JWT
 verification, bounded ingress, Worker integration and an install proposal target

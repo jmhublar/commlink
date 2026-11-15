@@ -30,9 +30,12 @@ spec:
           ports: [{ name: http, containerPort: 8080 }]
           env:
             - { name: COMMLINK_GATEWAY_HOST, value: "0.0.0.0" }
+            - { name: COMMLINK_GATEWAY_AUTH_MODE, value: {{ .Values.authMode | quote }} }
+{{- if eq .Values.authMode "access" }}
             - { name: COMMLINK_GATEWAY_ISSUER, value: {{ .Values.access.issuer | quote }} }
             - { name: COMMLINK_GATEWAY_AUDIENCE, value: {{ .Values.access.audience | quote }} }
             - { name: COMMLINK_GATEWAY_SERVICE_ID, value: {{ .Values.access.serviceId | quote }} }
+{{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
