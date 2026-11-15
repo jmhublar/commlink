@@ -1,11 +1,12 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "commlink-prototype",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Private CommLink mailbox and MCP event subscription prototype for HUB-300.",
   "author": { "name": "Joshua Hublar" },
   "extensions": {
     "com.openai": {
+      "apps": "./.app.json",
       "interface": {
         "displayName": "CommLink Prototype",
         "shortDescription": "Private agent mailbox",

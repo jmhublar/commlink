@@ -1,9 +1,11 @@
 # Native Dot wake setup
 
 Native MCP Events is Joshua's selected default for HUB-300. The private plugin
-is version 0.1.1; its skill preserves that choice, reuses a matching subscription,
+is version 0.1.2; its skill preserves that choice, reuses a matching subscription,
 handles mailbox recovery and deduplication, and separates receipt from work.
-This is a configured instruction default, not a completed live subscription.
+ChatGPT OAuth and tool/event discovery passed on 2026-11-15. This is a configured
+instruction default, not a completed live subscription. The relay and OAuth run
+on Cloudflare; Basestar is optional for later task execution.
 
 ## Credentials
 
@@ -18,11 +20,15 @@ is no manually generated API key to obtain for this path.
 
 ## ChatGPT connection
 
-Use the existing CommLink server's connection/manage screen if available. The
-packaged private plugin currently shows one MCP server and one skill, but no
-connected tools/events or OAuth connection controls were visible on its web page.
-OpenAI also documents Plugins → Add → Add custom MCP server for creating the
-authenticated server connection. Do not repeatedly create duplicate entries.
+The authenticated [CommLink app](https://chatgpt.com/plugins/plugin_asdk_app_6afa22b05dc88191a45a30e16dfde7ec)
+is connected. Its app ID is `asdk_app_6afa22b05dc88191a45a30e16dfde7ec`.
+CommLink Prototype references that verified app through `.app.json`, preserving
+its existing private identity, MCP configuration and native-wake skill.
+Use this existing connection; do not create duplicate entries.
+
+The successful setup used a fresh Chrome tab at ChatGPT → Plugins → Add → Add
+custom MCP server. The older tab's unresponsive Add menu was a UI blocker, not
+an account restriction. These settings are retained for recovery:
 
 Use these settings in that connection form:
 
@@ -33,28 +39,31 @@ Use these settings in that connection form:
 | Connection | Public HTTPS / Streamable HTTP |
 | MCP server URL | https://commlink-prototype.joshua-m-hublar.workers.dev/mcp |
 | Authentication | OAuth |
-| Client registration | Dynamic client registration, if explicitly offered |
+| Client registration | Dynamic Client Registration (DCR) |
 | OAuth client ID / secret | Leave unset when using DCR; do not substitute the service-token files |
 
-Copy the exact **OAuth redirect URI** shown by ChatGPT's management/setup screen.
-This URI is nonsecret; it is different from the later event-delivery URL. If the
-form provides no redirect or fails first, retain the exact error and stop rather
-than guessing a callback or inserting a service key.
+The setup form supplied the exact redirect
+`https://chatgpt.com/connector/oauth/zdznSZvJxJYf`. This URI is nonsecret and is
+different from the later event-delivery URL. Do not substitute the generic stable
+callback: Access metadata matches the issuer but does not advertise RFC 9207
+authorization-response issuer support. A replacement connection must use its own
+observed redirect rather than assuming this connector-specific value applies.
 
 ## Access configuration and login
 
 The existing Access application is `84582df9-1583-4e5c-b0ec-770708c448d3`.
-Managed OAuth is already on, but DCR remains off and allowed redirects are empty.
-After obtaining ChatGPT's actual redirect:
+DCR is enabled with only the exact redirect above allowed. Localhost and loopback
+wildcards remain disabled. API readback confirmed unchanged hostname/Worker
+destinations, audience, IdP, all three owner/service policies, 15-minute access
+tokens and 336-hour grants. The registration endpoint is now advertised:
+`https://cogignition.cloudflareaccess.com/cdn-cgi/access/oauth/registration`.
 
-1. Preserve the application's hostname, immutable Worker association, all owner
-   and service policies, and existing session lifetimes.
-2. Allowlist only the exact ChatGPT redirect and enable DCR.
-3. Retry Connect in ChatGPT and complete the normal Cloudflare identity login as
-   the existing allowed owner. Cloudflare generates the OAuth tokens.
-4. Confirm the discovered tools are `send`, `poll`, `ack`, `link_status`, and the
-   event is `commlink.message.created`. Refresh/rescan metadata if needed.
-5. Confirm authenticated `link_status.self` is `openai`.
+After Joshua approved the connection, ChatGPT registered its client, Cloudflare
+showed the existing allowed owner signed in, and consent returned to ChatGPT.
+The connected app displays `send`, `poll`, `ack`, `link_status`, and the event
+`commlink.message.created`. No service-token file was used as an OAuth credential.
+Authenticated `link_status.self = openai` through this new app still needs a host
+tool invocation; successful metadata discovery is not a mailbox or wake test.
 
 The operator can make the Access settings change through the already-connected
 Cloudflare tool. Joshua need not create another API key. The future GitHub
@@ -83,15 +92,16 @@ Test using a fresh Robut-originated nonce, with no manual prompt/poll triggering
 the Dot. Record event receipt, the existing Dot's response, correlated mailbox
 reply and Robut acknowledgment independently. A callback 2xx alone is not proof.
 
-## Observed setup blockers, 2026-11-15
+## Remaining acceptance gates, 2026-11-15
 
-- The private plugin's web shortcut opens ChatGPT desktop. Computer-use access to
-  `com.openai.codex` was explicitly denied for safety reasons; it was not retried.
-- The web directory's Add menu did not expand using available semantic controls,
-  including after a refresh. No connection was created through that route.
-- No CommLink connection/subscription tool is exposed to this local task.
-- OAuth redirect/DCR, callback transport validation and an owning-Dot subscription
-  still need completion. No Mac watcher, SMS route or polling task was installed.
+- The connected app's tools/events are visible in ChatGPT, but no CommLink tool or
+  native subscription capability is exposed to this already-running local task.
+  The owning Dot must discover the new app and supply its own native callback.
+- Connection-time callback destination validation is not yet implemented/proved;
+  the Worker callback-origin allowlist remains empty.
+- The owning Dot's subscription, unprompted fresh-nonce response, and subsequent
+  cloud-task launch remain unverified. No Mac watcher, SMS route or polling task
+  was installed.
 
 ## Sources
 

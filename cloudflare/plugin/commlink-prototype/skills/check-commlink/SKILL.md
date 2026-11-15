@@ -9,8 +9,10 @@ checking the connection. Linear remains the source of truth for authorized work.
 
 ## Default wake setup
 
-Use the connected CommLink tools and the host's native event subscription
-feature. The target is Joshua's existing owning Dot. Subscribe to
+Use the connected CommLink App (`asdk_app_6afa22b05dc88191a45a30e16dfde7ec`)
+and the host's native event subscription feature. This package references that
+existing OAuth connection; do not create a duplicate server or paste service
+credentials into its OAuth settings. The target is Joshua's existing owning Dot. Subscribe to
 `commlink.message.created` with `recipient: openai`. Reuse an existing matching
 subscription; do not create another task or conversation for each check.
 Let the host supply the callback URL and signing secret and renew the subscription

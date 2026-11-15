@@ -10,7 +10,7 @@
   "identity_provider_id": "e13ece2f-54a4-4052-9892-c7374767484e",
   "mcp_url": "https://commlink-prototype.joshua-m-hublar.workers.dev/mcp",
   "plan": "Workers Free (confirmed by API)",
-  "status": "Grok wake, nonce reply and both receipt acknowledgments verified; automatic Dot wake pending OAuth and event subscription",
+  "status": "Grok round trip and ChatGPT OAuth tool/event discovery verified; automatic Dot wake pending callback validation and owning-Dot subscription",
   "metadata": {
     "main_module": "worker.js",
     "compatibility_date": "2026-07-30",
@@ -95,11 +95,23 @@
   },
   "plugin": {
     "id": "plugins_6af9fc8296c48191aeb72f02476d8fec",
-    "release_id": "pluginrel_6af9fc831120819195d7ac45337ee1d2",
+    "release_id": "pluginrel_6afa23e9b7f881919b8014ef54c275f8",
+    "version": "0.1.2",
     "url": "https://chatgpt.com/plugins/plugins_6af9fc8296c48191aeb72f02476d8fec",
     "scope": "USER",
     "visibility": "PRIVATE",
-    "connection_status": "pending OAuth client redirect and login"
+    "connection_status": "OAuth connected; four tools and commlink.message.created discovered in ChatGPT",
+    "connected_app_id": "asdk_app_6afa22b05dc88191a45a30e16dfde7ec",
+    "connected_app_plugin_id": "plugin_asdk_app_6afa22b05dc88191a45a30e16dfde7ec"
+  },
+  "oauth_registration": {
+    "dynamic_client_registration_enabled": true,
+    "allowed_redirect_uri": "https://chatgpt.com/connector/oauth/zdznSZvJxJYf",
+    "registration_endpoint": "https://cogignition.cloudflareaccess.com/cdn-cgi/access/oauth/registration",
+    "allow_any_on_localhost": false,
+    "allow_any_on_loopback": false,
+    "access_token_lifetime": "15m",
+    "grant_session_duration": "336h"
   },
   "gpt_access_policy_id": "6de17479-974e-47af-a84a-86784626e2d8",
   "gpt_service_token_id": "c21d38e0-c844-4ce1-aa06-bfba641e3d18",
