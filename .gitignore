@@ -1,0 +1,6 @@
+# Runtime state, tokens and DB live in ~/.hub-relay/ and are never committed.
+.hub-relay/
+*.db
+*.bak*
+tokens/
+__pycache__/
