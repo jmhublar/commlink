@@ -8,6 +8,22 @@ export interface CallbackEnv {
   CALLBACK_ACCESS_CLIENT_SECRET?: string;
 }
 
+// Data-free operational check through the exact delivery binding. No callback
+// URL, credentials or mailbox payload is sent; errors stay categorized.
+export async function callbackHealth(env:CallbackEnv) {
+  const mode=env.CALLBACK_TRANSPORT_MODE??'access';
+  if(mode!=='vpc')return {mode,reachable:null};
+  if(!env.CALLBACK_GATEWAY||env.CALLBACK_TRANSPORT_URL||env.CALLBACK_ACCESS_CLIENT_ID||env.CALLBACK_ACCESS_CLIENT_SECRET)
+    return {mode,reachable:false};
+  try {
+    const r=await env.CALLBACK_GATEWAY.fetch('http://commlink-callback.commlink.svc.cluster.local:8080/healthz',{
+      redirect:'manual',signal:AbortSignal.timeout(2000)});
+    if(r.status!==200){await r.body?.cancel();return {mode,reachable:false};}
+    const value=object(JSON.parse(await readBody(r,1024)));exact(value,['ok']);
+    return {mode,reachable:value.ok===true};
+  } catch {return {mode,reachable:false};}
+}
+
 // The operator configures one owned gateway; a callback cannot choose this URL.
 // Both verification and events must use it. There is no direct-fetch fallback.
 export async function callbackPost(env:CallbackEnv,url:string,headers:Record<string,string>,body:string):Promise<Response> {

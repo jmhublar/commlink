@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 
 const built = await build({ entryPoints: ['src/callback.ts'], bundle: true, format: 'esm', write: false });
-const { callbackPost } = await import('data:text/javascript;base64,' + Buffer.from(built.outputFiles[0].text).toString('base64'));
+const { callbackPost, callbackHealth } = await import('data:text/javascript;base64,' + Buffer.from(built.outputFiles[0].text).toString('base64'));
 const config = { CALLBACK_TRANSPORT_URL: 'https://gateway.example/v1/deliver',
   CALLBACK_ACCESS_CLIENT_ID: 'synthetic-id', CALLBACK_ACCESS_CLIENT_SECRET: 'synthetic-secret' };
 const payload = ['https://connectors.api.openai.com/synthetic-capability', { 'webhook-signature': 'synthetic-signature' }, 'exact π bytes'];
@@ -47,6 +47,26 @@ test('Worker callback transport fails closed with no direct-fetch fallback', asy
       assert.equal((await callbackPost(config, ...payload)).status, status);
     }
   });
+});
+
+test('authenticated status health uses only the fixed binding and suppresses sensitive errors',async t=>{
+  t.mock.method(globalThis,'fetch',async()=>assert.fail('health must not use global fetch'));
+  assert.deepEqual(await callbackHealth({}),{mode:'access',reachable:null});
+  assert.deepEqual(await callbackHealth({CALLBACK_TRANSPORT_MODE:'vpc'}),{mode:'vpc',reachable:false});
+  let response=()=>Response.json({ok:true});let calls=0;
+  const env={CALLBACK_TRANSPORT_MODE:'vpc',CALLBACK_GATEWAY:{fetch:async(url,init)=>{
+    calls++;assert.equal(url,'http://commlink-callback.commlink.svc.cluster.local:8080/healthz');
+    assert.equal(init.redirect,'manual');assert.equal(init.body,undefined);assert.equal(init.headers,undefined);
+    return response();
+  }}};
+  assert.deepEqual(await callbackHealth(env),{mode:'vpc',reachable:true});
+  for(const invalid of [()=>new Response(null,{status:302}),()=>Response.json({ok:true,secret:'synthetic'}),
+    ()=>new Response('x'.repeat(1025)),()=>{throw Error('synthetic secret path');}]){
+    response=invalid;assert.deepEqual(await callbackHealth(env),{mode:'vpc',reachable:false});
+  }
+  const before=calls;
+  assert.deepEqual(await callbackHealth({...env,CALLBACK_ACCESS_CLIENT_SECRET:'mixed'}),{mode:'vpc',reachable:false});
+  assert.equal(calls,before);
 });
 
 test('private VPC transport uses only its fixed service binding', async t => {

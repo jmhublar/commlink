@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { GrokWake, type GrokEnv } from './grok-wake';
-import { callbackPost, type CallbackEnv } from './callback';
+import { callbackPost, callbackHealth, type CallbackEnv } from './callback';
 import { EVENT, RpcError, object, exact, string, integer, peer, canonical, sha, equal, signingKey, signature, readBody, envelope, eventDefinition, tools, uuid, type Identity, type ObjectValue, type Peer } from './protocol';
 
 // Configuration is supplied by deployment metadata; no request can select an issuer.
@@ -143,7 +143,7 @@ export class Mailbox extends DurableObject<Env> {
         if(p.name==='send')result=await this.send(id,a);
         else if(p.name==='poll')result=this.poll(id,a);
         else if(p.name==='ack')result=this.ack(id,a);
-        else if(p.name==='link_status')result=this.status(id,a);
+        else if(p.name==='link_status')result=await this.status(id,a);
         else throw new RpcError(-32602,'Unknown tool');
         return {content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result};
       } catch(e) {
@@ -199,13 +199,13 @@ export class Mailbox extends DurableObject<Env> {
     });
     return {status:'acked'};
   }
-  private status(id:Identity,a:ObjectValue) {
+  private async status(id:Identity,a:ObjectValue) {
     exact(a,[]);
     return {self:id.peer,pending:Number(this.row('SELECT COUNT(*) AS n FROM messages WHERE recipient=? AND acked IS NULL AND expires>?',id.peer,Date.now())!.n),
       subscriptions:this.rows('SELECT id,expires FROM subscriptions WHERE owner=?',id.key),
       last_subscription_attempt:this.row('SELECT attempted,outcome,code,reason,callback_origin FROM subscription_attempts WHERE owner=? AND attempted>?',id.key,Date.now()-86400000)??null,
       deliveries:this.rows('SELECT o.id,o.message_id,o.status,o.attempts,o.last_http,o.last_error FROM outbox o JOIN subscriptions s ON o.sub_id=s.id WHERE s.owner=? ORDER BY o.due DESC LIMIT 30',id.key),
-      grok_routine:this.grok.status()};
+      grok_routine:this.grok.status(),callback_transport:await callbackHealth(this.env)};
   }
   private async subscriptionIdentity(id:Identity,p:ObjectValue,withSecret:boolean) {
     exact(p,['name','arguments','delivery','cursor','ttlMs'],['name','arguments','delivery']);

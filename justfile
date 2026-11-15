@@ -39,3 +39,9 @@ callback-chart-package destination="/tmp/commlink-chart": callback-chart-check
 # Install proposal: supply reviewed nonsecret values. SysOp/Flux owns application.
 basestar-install-plan values:
     helm template commlink-callback charts/commlink-callback --namespace commlink -f {{quote(values)}}
+
+# Publish only this reviewed image/chart to the existing local registry.
+callback-artifacts-publish:
+    docker --context orbstack tag commlink-callback:hub300-review localhost:5111/commlink-callback:a05d7bd
+    docker --context orbstack push localhost:5111/commlink-callback:a05d7bd
+    helm push /tmp/commlink-chart/commlink-callback-0.2.0.tgz oci://localhost:5111/helm --plain-http
