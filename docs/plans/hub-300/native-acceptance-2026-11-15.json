@@ -1,0 +1,57 @@
+{
+  "correlation_id": "da893f39-2fd9-4dd4-84e2-14c7129ec3ea",
+  "request_id": "bc2d1f68-9631-409f-847c-894108add2c0",
+  "challenge_id": "123c2996-b2bd-4bd1-82c1-deda8b27375f",
+  "echo_id": "fa710acc-b01a-4b85-b1e5-172410e4d9e2",
+  "completion_id": "bfeb184f-1e53-4592-a845-ea5aed07fa55",
+  "owning_dot_wake_and_verbatim_echo_source": "Trusted parent-task report of native-event execution; child did not poll or echo the challenge",
+  "robut_receipt_evidence": [
+    "echo Grok wake drained",
+    "Robut-authenticated completion read/acked by owning Dot reports echo received and acknowledged"
+  ],
+  "observation_start_utc": "2026-11-15 23:19:53 UTC",
+  "observation_end_utc": "2026-11-15 23:21:59 UTC",
+  "observation_seconds": 126,
+  "start_pending": 0,
+  "end_pending": 0,
+  "start_deliveries": [
+    {
+      "id": "evt_ae63ad3e-45fa-49d4-9a29-48b0c181f27e",
+      "message_id": "bfeb184f-1e53-4592-a845-ea5aed07fa55",
+      "status": "accepted",
+      "attempts": 1,
+      "last_http": 200,
+      "last_error": null
+    },
+    {
+      "id": "evt_958224df-6950-41d2-88e0-51bd5547fa62",
+      "message_id": "123c2996-b2bd-4bd1-82c1-deda8b27375f",
+      "status": "accepted",
+      "attempts": 1,
+      "last_http": 200,
+      "last_error": null
+    }
+  ],
+  "end_deliveries": [
+    {
+      "id": "evt_ae63ad3e-45fa-49d4-9a29-48b0c181f27e",
+      "message_id": "bfeb184f-1e53-4592-a845-ea5aed07fa55",
+      "status": "accepted",
+      "attempts": 1,
+      "last_http": 200,
+      "last_error": null
+    },
+    {
+      "id": "evt_958224df-6950-41d2-88e0-51bd5547fa62",
+      "message_id": "123c2996-b2bd-4bd1-82c1-deda8b27375f",
+      "status": "accepted",
+      "attempts": 1,
+      "last_http": 200,
+      "last_error": null
+    }
+  ],
+  "completion_policy_deviation": "Robut sent one extra completion instead of Linear-only report; Dot acked it without replying",
+  "additional_loop_observed": false,
+  "unrelated_correlation_excluded": "b266c559-45f5-46c0-b6ca-e4df9b27ba49",
+  "renewal_beyond_one_hour_tested": false
+}

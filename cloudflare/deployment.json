@@ -10,7 +10,7 @@
   "identity_provider_id": "e13ece2f-54a4-4052-9892-c7374767484e",
   "mcp_url": "https://commlink-prototype.joshua-m-hublar.workers.dev/mcp",
   "plan": "Workers Free (confirmed by API)",
-  "status": "Private Basestar VPC gateway live and health/isolation/pinned TLS verified; exact OpenAI origin enabled; owning-Dot native subscription and wake unproved",
+  "status": "Private VPC gateway live; existing owning Dot native wake, exact nonce echo and Robut receipt demonstrated; one extra completion wake stopped without reply; no further native delivery observed for126seconds",
   "metadata": {
     "main_module": "worker.js",
     "compatibility_date": "2026-07-30",
@@ -138,5 +138,12 @@
     "image_digest": "sha256:814667b71b35bb950888e722db9d45d5edbc433f11aa0d2eebef07a11104829c",
     "health_verified": true,
     "isolation_verified": true
+  },
+  "native_acceptance": {
+    "correlation_id": "da893f39-2fd9-4dd4-84e2-14c7129ec3ea",
+    "challenge_message_id": "123c2996-b2bd-4bd1-82c1-deda8b27375f",
+    "echo_message_id": "fa710acc-b01a-4b85-b1e5-172410e4d9e2",
+    "evidence": "../docs/plans/hub-300/native-acceptance-2026-11-15.md",
+    "subscription_renewal_tested": false
   }
 }

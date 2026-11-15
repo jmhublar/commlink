@@ -58,3 +58,11 @@ and correlated Robut reply separately. A callback2xx alone is not completion.
 
 No new application credential, Access app, public gateway hostname, paid upgrade,
 account role or shared tunnel restart was needed. Basestar uptime remains required.
+
+## Native test follow-up
+
+The owning Dot created its native subscription and completed a fresh Robut nonce
+echo after a native event wake. See native-acceptance-2026-11-15.md for staged
+evidence and the extra completion-message deviation; no eternal no-loop claim.
+SysOp review17eaf7f completed clean after a fourth live isolation test proved an
+untrusted label is blocked inside the allowed tunnel namespace.
