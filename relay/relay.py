@@ -4,6 +4,7 @@ Stdlib only. Binds 127.0.0.1 (exposed tailnet-only via `tailscale serve`).
 Auth: per-principal bearer tokens read from files under $HUB_RELAY_HOME/tokens/ (never in code/logs).
 Payloads are stored opaquely, never logged or interpreted."""
 import json, os, sqlite3, threading, time, uuid, re, random, urllib.request, hmac
+import grok_routine
 from datetime import datetime, timezone, timedelta
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
@@ -76,14 +77,21 @@ def _do_ring(peer, url):
     st = _bell[peer]; st["pending_timer"] = False; st["last_ring"] = time.time()
     with _db_lock:
         c = db(); r = c.execute("SELECT MAX(server_seq), COUNT(*) FROM msgs WHERE mailbox=? AND acked_at IS NULL AND expires_at>?", (peer, time.time())).fetchone(); c.close()
+    is_routine = peer == "robut" and url == "grok-routine"
+    if is_routine and not r[1]:
+        return
     body = json.dumps({"v": "1.0", "mailbox": peer, "latest_server_seq": r[0] or 0, "pending": r[1], "sent_at": iso(now())}).encode()
     for i, backoff in enumerate((0, 1, 3)):
         if backoff: time.sleep(backoff + random.random() * 0.5)
         try:
-            req = urllib.request.Request(url, data=body, method="POST", headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                if resp.status < 300:
-                    st.update(last_ok_at=now(), last_error=None, consecutive_failures=0); log("doorbell ok", peer); return
+            if is_routine:
+                grok_routine.wake(HOME)
+            else:
+                req = urllib.request.Request(url, data=body, method="POST", headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    if resp.status >= 300:
+                        raise OSError("doorbell HTTP error")
+            st.update(last_ok_at=now(), last_error=None, consecutive_failures=0); log("doorbell ok", peer); return
         except Exception as e:
             err = type(e).__name__; st["last_error"] = "timeout" if "timeout" in str(e).lower() else ("refused" if "refused" in str(e).lower() else err)
     st["consecutive_failures"] += 1; log("doorbell failed", peer, st["last_error"])

@@ -1,0 +1,15 @@
+{
+  "issue": "HUB-300",
+  "captured_at": "2026-11-15T06:50:54+00:00",
+  "producer": "local",
+  "mode": "local-authored",
+  "author": "codex:01a1dde5-86fb-7e22-b9b5-4d4ba6dbf87b",
+  "external_planner": null,
+  "built_in_tools": "not-invoked",
+  "capture_kind": "text",
+  "path": "docs/plans/hub-300/plan.md",
+  "source_sha256": "c042dcfef54501003f9d7d057f2a5e4f7160d26ec8475de7c25c279153847553",
+  "plan_sha256": "c042dcfef54501003f9d7d057f2a5e4f7160d26ec8475de7c25c279153847553",
+  "prompt_sha256": null,
+  "status": "awaiting"
+}
