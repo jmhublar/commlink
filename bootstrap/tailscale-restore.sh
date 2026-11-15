@@ -5,6 +5,9 @@
 # Fix: the watchdog mirrors the state to a box-owned copy (STATE_MIRROR); this script restores from it
 # before starting tailscaled, so the same node identity comes back after a rebuild.
 set -u
+# Source of truth: github.com/jmhublar/commlink, checked out at $REPO. No secrets live in the repo:
+# TAILSCALE_AUTHKEY_COMLINK comes from the environment; relay tokens/DB live in ~/.hub-relay (0700).
+REPO=${COMMLINK_REPO:-/home/box/commlink}
 TSDIR=/home/box/.tailscale; STATE=$TSDIR/tailscaled.state; STATE_MIRROR=$TSDIR/tailscaled.state.mirror
 SOCK=/var/run/tailscale/tailscaled.sock
 LOG=$TSDIR/restore.log; mkdir -p "$TSDIR"; chmod 700 "$TSDIR"
@@ -77,13 +80,16 @@ if [ "$BS" != "Running" ]; then
 fi
 sudo -n tailscale set --operator=box >/dev/null 2>&1
 # 5b. 2026-11-15: node name is "grok" (Joshua); the service address svc-commlink is what clients use.
-# 6. Comlink relay supervisor (tailnet-ip mode)
+# 6. Comlink relay supervisor (tailnet-ip mode), run from the repo checkout. Pull first if a read-only deploy key is set up.
+if [ -d "$REPO/.git" ] && [ -f /home/box/.ssh/commlink_deploy ]; then
+  git -C "$REPO" pull --ff-only -q >>"$LOG" 2>&1 && log "pulled $(git -C "$REPO" rev-parse --short HEAD)" || log "WARNING: git pull failed; running current checkout"
+fi
 chmod 700 /home/box/.hub-relay /home/box/.hub-relay/tokens 2>/dev/null
-if [ -x /workspace/hub-300/relay/supervisor.sh ] && ! pgrep -f hub-300/relay/supervisor.sh >/dev/null; then
+if [ -x "$REPO/relay/supervisor.sh" ] && ! pgrep -f commlink/relay/supervisor.sh >/dev/null; then
   for i in $(seq 1 12); do tailscale ip -4 >/dev/null 2>&1 && break; sleep 5; done
-  HUB_RELAY_MODE=tailnet-ip nohup /workspace/hub-300/relay/supervisor.sh >/dev/null 2>&1 &
-  log "started relay supervisor"
-elif [ ! -d /workspace/hub-300 ]; then log "WARNING: /workspace/hub-300 missing"; fi
+  HUB_RELAY_MODE=tailnet-ip setsid -f "$REPO/relay/supervisor.sh" >/dev/null 2>&1 </dev/null
+  log "started relay supervisor from $REPO"
+elif [ ! -d "$REPO" ]; then log "WARNING: $REPO missing; clone github.com/jmhublar/commlink there"; fi
 # 7. svc:svc-commlink (stable client address https://svc-commlink.tailbde0eb.ts.net), proxied to the relay on this node's tailnet IP.
 #    A NEW node needs admin approval as the service host unless an autoApprover covers tag:commlink.
 TIP=$(tailscale ip -4 2>/dev/null | head -1)

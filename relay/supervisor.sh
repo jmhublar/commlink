@@ -2,7 +2,7 @@
 # HUB-300 relay supervisor: same pattern as /usr/local/sbin/tailscale-watchdog (no cron/systemd).
 # Restarts relay + doorbell listener if they die; re-applies `tailscale serve` (HTTPS, tailnet-only) if missing.
 # NEVER enables Funnel. Uses no auth keys.
-DIR=/workspace/hub-300/relay
+DIR=$(cd "$(dirname "$0")" && pwd)
 export HUB_RELAY_HOME="${HUB_RELAY_HOME:-$HOME/.hub-relay}"
 LOG="$HUB_RELAY_HOME/supervisor.log"
 mkdir -p "$HUB_RELAY_HOME"
