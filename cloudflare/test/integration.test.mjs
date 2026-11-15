@@ -48,7 +48,7 @@ test('real Worker: authenticated mailbox and durable signed event delivery', {ti
   const tool=async(role,name,args={})=>{const response=await rpc(role,'tools/call',{name,arguments:args});assert.ok(!response.error,JSON.stringify(response));return response.result;};
   const value=r=>r.structuredContent;
   const msg=(from='robut',type='MSG',payload={content_type:'text/plain',body:'synthetic nonce '+randomUUID(),issue_id:'HUB-300'})=>({protocol_version:'1.0',message_id:randomUUID(),correlation_id:randomUUID(),from,to:from==='robut'?'openai':'robut',type,seq:1,timestamp:new Date().toISOString(),ttl:300,payload});
-  const subscription=(path='/events',recipient='openai',secret=keys.get(path))=>({name:'commlink.message.created',arguments:{recipient},delivery:{mode:'webhook',url:'https://callback.example'+path,secret},cursor:null});
+  const subscription=(path='/events',recipient='openai',secret=keys.get(path))=>({name:'commlink.message.created',arguments:{recipient},delivery:{mode:'webhook',url:'https://callback.example'+path,secret},cursor:null,_meta:{'openai/locale':'en-US'}});
   keys.set('/events','whsec_'+randomBytes(32).toString('base64'));
 
   await t.test('rejects missing, forged, wrong-audience and unmapped identities',async()=>{
@@ -61,7 +61,24 @@ test('real Worker: authenticated mailbox and durable signed event delivery', {ti
     assert.deepEqual((await rpc('openai','initialize',{protocolVersion:'2025-06-18'})).result.capabilities,{tools:{},events:{}});
   });
   let subId;
+  await t.test('accepts MCP request metadata without treating it as tool arguments or identity',async()=>{
+    for(const args of [{arguments:{}},{}]){
+      const result=await rpc('openai','tools/call',{name:'link_status',...args,_meta:{progressToken:'status-check','openai/locale':'en-US',peer:'robut'}});
+      assert.equal(result.result?.structuredContent?.self,'openai',JSON.stringify(result));
+    }
+    const bad=await rpc('openai','tools/call',{name:'link_status',arguments:{unexpected:true},_meta:{}});
+    assert.equal(bad.result?.isError,true,'metadata must not relax tool argument validation');
+    assert.equal((await rpc('openai','tools/call',{name:'link_status',_meta:'invalid'})).error?.code,-32602);
+    assert.equal((await rpc('openai','tools/call',{name:'link_status',extra:true,_meta:{}})).error?.code,-32602);
+  });
   await t.test('verifies callbacks and rejects wrong-recipient and unapproved destinations',async()=>{
+    const diagnostic=subscription();diagnostic.delivery.url='https://unapproved.example/private-capability?token=never-echo';
+    const blocked=await rpc('openai','events/subscribe',diagnostic);
+    assert.deepEqual(blocked.error?.data,{reason:'callback_origin_not_approved',callback_origin:'https://unapproved.example'});
+    assert.ok(!JSON.stringify(blocked).includes('never-echo')&&!JSON.stringify(blocked).includes('private-capability'));
+    assert.equal(verifications.length,0,'unapproved origin causes no outbound request');
+    const malformed=subscription();malformed.delivery.url='not a URL';
+    assert.equal((await rpc('openai','events/subscribe',malformed)).error?.code,-32602);
     assert.equal((await rpc('robut','events/subscribe',subscription())).error.code,-32003);
     const invalid=subscription();invalid.delivery.url='http://127.0.0.1/private';
     assert.equal((await rpc('openai','events/subscribe',invalid)).error.code,-32602);

@@ -19,9 +19,13 @@ try {
   async function tool(name,args={}){
     const r=await fetch(record.mcp_url,{method:'POST',redirect:'error',signal:AbortSignal.timeout(15000),headers:{
       'Content-Type':'application/json','User-Agent':'CommLinkAcceptance/0.2','CF-Access-Client-Id':id,'CF-Access-Client-Secret':key
-    },body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}})});
+    },body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args,_meta:{progressToken:'hub300-acceptance'}}})});
     if(r.status!==200){console.log(JSON.stringify({http_status:r.status}));throw Error();}
-    const body=await r.json();if(body.error||body.result?.isError||!body.result?.structuredContent)throw Error();return body.result.structuredContent;
+    const body=await r.json();
+    if(body.error||body.result?.isError||!body.result?.structuredContent){
+      console.log(JSON.stringify({rpc_error_code:typeof body.error?.code==='number'?body.error.code:null,tool_error:body.result?.isError===true}));throw Error();
+    }
+    return body.result.structuredContent;
   }
   const status=await tool('link_status');if(status.self!=='openai')throw Error();
   const active=status.grok_routine?.active;

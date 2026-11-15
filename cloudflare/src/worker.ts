@@ -39,11 +39,16 @@ async function authenticate(request:Request,env:Env):Promise<Identity> {
 // Callbacks are restricted to exact, operator-vetted service origins. General
 // user-supplied webhook hosts are deliberately unsupported. No redirects or IPs.
 function callbackUrl(value:unknown,env:Env):string {
-  const url=new URL(string(value));
+  let url:URL;
+  try{url=new URL(string(value));}catch{throw new RpcError(-32602,'Invalid callback URL');}
   const origins:unknown=JSON.parse(env.CALLBACK_ORIGINS_JSON||'[]');
   if(url.protocol!=='https:' || url.username || url.password || url.hash || url.port ||
-    /^[\d.]+$/.test(url.hostname) || url.hostname.includes(':') ||
-    !Array.isArray(origins)||!origins.includes(url.origin))throw new RpcError(-32602,'Callback origin is not approved');
+    /^[\d.]+$/.test(url.hostname) || url.hostname.includes(':'))throw new RpcError(-32602,'Invalid callback URL');
+  // Return only the nonsecret origin so the operator can approve the actual
+  // host supplied by ChatGPT. Never echo the capability path, query or secret.
+  if(!Array.isArray(origins)||!origins.includes(url.origin))throw new RpcError(-32602,'Callback origin is not approved',{
+    reason:'callback_origin_not_approved',callback_origin:url.origin
+  });
   return url.href;
 }
 async function webhook(url:string,secret:string,id:string,subscription:string,body:string,previous?:string):Promise<Response> {
@@ -91,7 +96,10 @@ export class Mailbox extends DurableObject<Env> {
   }
   private async dispatch(id:Identity,method:string,params:unknown):Promise<unknown> {
     if(!authorized(this.env,id))throw new RpcError(-32003,'Forbidden');
-    const p=object(params??{});
+    // MCP request metadata is transport context, not part of a tool's arguments
+    // or an event's subscription identity. Never use it to select the peer.
+    const {_meta,...p}=object(params??{});
+    if(_meta!==undefined)object(_meta);
     // Bound unknown methods to one bucket; caller-controlled names must not grow
     // an unbounded set of persisted rate-limit keys.
     if(method!=='tools/call')this.rate(id,['initialize','ping','tools/list','events/list','events/subscribe','events/unsubscribe'].includes(method)?method:'unknown');
