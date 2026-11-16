@@ -6,6 +6,10 @@ description: Process versioned CommLink role/tier session requests in Joshua's e
 Only Joshua's existing owning dot coordinates this workflow. Keep the native
 CommLink subscription in that conversation. Do not create another dot, watcher,
 subscription owner or scheduler as a fallback. Grok handles its pstack mapping.
+Read [host capabilities](../../references/host-capabilities.md) when checking
+tool availability. The connected live host currently lacks the session_* tools;
+their implementation in source is not deployment evidence. If absent, preserve
+the request and blocker instead of inventing a call or launching directly.
 
 ## Gates
 
@@ -28,6 +32,10 @@ entitlement receipt. Speed is default only. Workdir control and a cloud hard
 timeout are unavailable/unverified. Never silently substitute models, efforts,
 speed, environments, softer deadlines or a local executor. Require a verified
 completion/recheck wake back to this same dot before unattended admission.
+The owning dot's one-time scheduled recovery was demonstrated with the supervised
+probe. That does not activate a standing grant or prove continuing schedules,
+immediate provider push or terminal delivery to Grok. Use watch-session-completion
+to establish an explicitly authorized recheck with the correct owner and limits.
 
 ## Receiving and recovering
 

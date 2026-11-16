@@ -7,6 +7,11 @@ Run in Joshua's existing singular owning dot. A skill supplies instructions; it
 does not subscribe to cloud completion or keep a process running after a turn.
 Use this after an actual event, an explicitly authorized scheduled return to
 this chat, or a supervised wait. State which trigger actually resumed the dot.
+Read [host capabilities](../../references/host-capabilities.md) before assuming
+the session_* tools are installed. Their current live absence is a blocker for
+the durable coordinator workflow, not permission to emulate admission or send
+an invented lifecycle receipt. A separately authorized direct status report
+must retain its own provenance and must not pretend to be that workflow.
 
 ## Recover the existing job
 

@@ -23,7 +23,7 @@ mechanism. That approval/control-plane path requires review before activation.
 
 There is no cloud credentials handler, `fetch`, provider launcher, polling loop,
 watcher, cancellation, retry-reset or privilege-changing action in the control
-module. Plugin source version 0.2.1 is prepared locally, not published/installed.
+module. Plugin source version 0.3.0 is prepared locally, not published/installed.
 
 ## Menu and wire contract
 
@@ -138,7 +138,10 @@ spend caps; this module does not terminate a provider task at their expiry.
 The coordinator must report an overrun while retaining the active slot.
 
 Native subscription renewal, cloud completion wake, unknown-launch reconciliation
-and the owner-approval control plane need separate live acceptance. Basestar
+and the owner-approval control plane have separate acceptance scopes. A root-bound
+one-time scheduled recovery has now been reported working after the owning dot's
+foreground turn ended; immediate provider push and full Grok lifecycle delivery
+remain unverified. Basestar
 remains in the existing callback ingress path. No new dot, watcher, connection,
 account, service identity or network route is created here.
 
@@ -166,10 +169,12 @@ actual saved target is the existing owning dot, and inspect its run evidence.
 Do not modify the existing event-only CommLink watch or silently install a schedule.
 
 A bounded native recheck attempt from the delegated CommLink worker demonstrated
-that hosted creation binds to the calling chat. Its saved thread was the worker,
-not the owning dot; the attempt was paused before its first run. The owning dot
-must create its own recheck and verify the returned thread binding. A source/
-parent thread link on a cloud task is not proof of completion delivery to that dot.
+that hosted creation binds to the calling chat. It was paused after its incorrect
+target was detected; a worker-bound invocation subsequently fired and is not
+owning-dot proof. The parent independently created a root-bound one-time recheck
+that fired after the owning dot's foreground turn ended and verified the completed
+COMMLINK_PILOT_OK probe. A source/parent thread link alone is not that proof.
+See [the maintained skill inventory](../docs/skills.md) for source/install status.
 
 Immediate provider-originated completion wake remains a separate integration
 gate. A skill, app notification, read_thread lookup or foreground wait is not
