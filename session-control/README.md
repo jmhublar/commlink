@@ -165,6 +165,12 @@ or slower; do not promise minute polling from documentation alone. Verify the
 actual saved target is the existing owning dot, and inspect its run evidence.
 Do not modify the existing event-only CommLink watch or silently install a schedule.
 
+A bounded native recheck attempt from the delegated CommLink worker demonstrated
+that hosted creation binds to the calling chat. Its saved thread was the worker,
+not the owning dot; the attempt was paused before its first run. The owning dot
+must create its own recheck and verify the returned thread binding. A source/
+parent thread link on a cloud task is not proof of completion delivery to that dot.
+
 Immediate provider-originated completion wake remains a separate integration
 gate. A skill, app notification, read_thread lookup or foreground wait is not
 proof of that event. A bounded native scheduled return can be tested against the

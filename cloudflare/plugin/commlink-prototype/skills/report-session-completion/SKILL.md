@@ -64,6 +64,12 @@ never accept a standalone chat or another coordinator as equivalent. Respect
 the connected scheduler's cadence limits. Polling introduces delay and is not
 an immediate completion event.
 
+Create a hosted recheck from the owning dot itself. A delegated worker's create
+call can bind the schedule to that worker chat; a parent/source link does not
+retarget it. If readback shows the wrong thread, pause the schedule before it
+runs and have the owning dot create its own check. Do not claim wake from a
+successfully saved schedule, or create another dot to accommodate misrouting.
+
 A real acceptance test ends the owning dot's foreground turn before the scheduled
 or provider event arrives. That native turn must retrieve the recorded provider
 result and drain the authorized outbox without a manual prompt/poll being its
