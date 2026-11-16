@@ -229,4 +229,24 @@ test('isolated workerd coordinator persists launch/status/outbox across an actua
   s=await tool(dot,'session_transition',{request_message_id:e.message_id,expected_version:s.status_seq,fence:p.fence,event:'finished',executor_id:'synthetic-cloud-thread',evidence:{source:'wait_threads',state:'finished'},result});
   assert.equal(s.state,'finished');assert.equal((await tool(dot,'session_recovery')).jobs.length,0);assert.equal((await tool(dot,'session_outbox')).messages.length,1);
   assert.equal((await tool(robut,'poll',{since:0})).messages.length,pending.messages.length,'outbox acceptance did not manufacture recipient acknowledgment');
+  // Simulate the owning dot returning after terminal state was committed but
+  // before its report was sent. No active slot does not mean no pending report.
+  const terminal=(await tool(dot,'session_outbox')).messages[0];
+  assert.equal(terminal.to,'robut');assert.equal(terminal.correlation_id,e.correlation_id);
+  const body=JSON.parse(terminal.payload.body);assert.equal(body.request_message_id,e.message_id);assert.equal(body.state,'finished');
+  await mf.dispose();await start();assert.equal((await tool(dot,'session_recovery')).jobs.length,0);
+  assert.deepEqual((await tool(dot,'session_outbox')).messages,[terminal]);
+  assert.equal((await tool(dot,'send',{to:'robut',msg:terminal})).status,'accepted');
+  // A crash after mailbox storage but before the outbox mark retries the same
+  // envelope. There must be exactly one terminal receipt in Robut's mailbox.
+  await mf.dispose();await start();assert.deepEqual((await tool(dot,'session_outbox')).messages,[terminal]);
+  assert.equal((await tool(dot,'send',{to:'robut',msg:terminal})).status,'duplicate');
+  await tool(dot,'session_outbox_mark_sent',{message_id:terminal.message_id});
+  let inbox=await tool(robut,'poll',{since:0});assert.equal(inbox.messages.filter(m=>m.envelope.message_id===terminal.message_id).length,1);
+  assert.equal((await tool(dot,'session_outbox')).messages.length,0);
+  assert.equal((await tool(robut,'ack',{id:terminal.message_id})).status,'acked');
+  assert.equal((await tool(robut,'ack',{id:terminal.message_id})).status,'already_acked');
+  inbox=await tool(robut,'poll',{since:0});assert.equal(inbox.messages.some(m=>m.envelope.message_id===terminal.message_id),false);
+  assert.equal((await tool(dot,'session_outbox')).messages.length,0,'recipient acknowledgment cannot create a completion echo');
+  assert.deepEqual((await tool(dot,'poll',{since:0})).messages.map(m=>m.envelope.message_id),[e.message_id]);
 });

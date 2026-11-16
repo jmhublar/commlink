@@ -23,7 +23,7 @@ mechanism. That approval/control-plane path requires review before activation.
 
 There is no cloud credentials handler, `fetch`, provider launcher, polling loop,
 watcher, cancellation, retry-reset or privilege-changing action in the control
-module. Plugin source version 0.2.0 is prepared locally, not published/installed.
+module. Plugin source version 0.2.1 is prepared locally, not published/installed.
 
 ## Menu and wire contract
 
@@ -141,6 +141,34 @@ Native subscription renewal, cloud completion wake, unknown-launch reconciliatio
 and the owner-approval control plane need separate live acceptance. Basestar
 remains in the existing callback ingress path. No new dot, watcher, connection,
 account, service identity or network route is created here.
+
+## Completion wake and reporting
+
+The source plugin's `report-session-completion` skill reconciles an existing job
+and drains the durable status outbox to Robut. It does not create an event or
+keep running after the dot ends its turn. Always inspect the outbox even when
+`session_recovery` has no active jobs: terminal work can still have an unsent
+report. Delivery preserves the original request/correlation and status-envelope
+ID across crashes. Mailbox acceptance is separate from Robut acknowledgment.
+
+The supervised SysOp probe on 2026-11-16 completed through `wait_threads` with
+no recorded tool calls. It did not prove unattended owning-dot wake, and it had
+no originating Robut request to which a lifecycle receipt could be attached.
+The existing CommLink native event is mailbox-message-created, not Codex-completed.
+
+The [scheduled-task guide](https://learn.chatgpt.com/docs/automations#schedule-a-task-inside-a-chat)
+documents a return to an existing chat. Connected heartbeat tooling also exposes
+a thread destination. A separately approved same-chat scheduled recheck is a
+concrete completion-recovery option, with polling delay rather than immediate
+delivery. The connected hosted automation tool limits recurring checks to hourly
+or slower; do not promise minute polling from documentation alone. Verify the
+actual saved target is the existing owning dot, and inspect its run evidence.
+Do not modify the existing event-only CommLink watch or silently install a schedule.
+
+Immediate provider-originated completion wake remains a separate integration
+gate. A skill, app notification, read_thread lookup or foreground wait is not
+proof of that event. A bounded native scheduled return can be tested against the
+already completed probe without launching another worker or sending live mail.
 
 ## Validation and review
 

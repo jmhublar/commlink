@@ -86,6 +86,10 @@ is provided by this package.
 
 ## Durable reporting
 
+Use report-session-completion in this same dot when reconciling a completed job
+after a supervised wait or a real event/scheduled return. That skill cannot wake
+the dot by itself. Always inspect the outbox even after the active slot is empty.
+
 Read session_outbox. Send each returned envelope unchanged with the normal send
 tool, retaining its message_id and correlation_id. Then call
 session_outbox_mark_sent; the server requires the exact accepted mailbox copy.
