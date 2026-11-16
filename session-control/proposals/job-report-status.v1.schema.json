@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://commlink.invalid/proposals/job-report-status.v1.schema.json",
+  "title": "Proposed job_report_status arguments; not a deployed tool",
+  "type": "object",
+  "properties": {
+    "job_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["finished", "failed"]
+    }
+  },
+  "required": ["job_id", "status"],
+  "additionalProperties": false
+}
