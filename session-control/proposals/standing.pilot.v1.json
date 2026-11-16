@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "policy_id": "commlink-standing-pilot",
+  "version": 1,
+  "state": "active",
+  "subject": "robut",
+  "rules": [
+    {
+      "id": "hub300-inline-transform-pilot",
+      "roles": ["utility"],
+      "tiers": ["light"],
+      "issues": ["HUB-300"],
+      "environments": ["cloud_pilot"],
+      "repositories": [],
+      "allow_repo_free": true,
+      "max_minutes": 5,
+      "allow_soft": true,
+      "operation_profile": "transform.bounded"
+    }
+  ],
+  "limits": {"concurrent_sessions": 1, "launches_per_rolling_hour": 1},
+  "on_unknown": "hold",
+  "confirmation_required": ["credentials_or_access_changes", "deploy", "merge", "purchase", "network_or_security_changes", "policy_or_control_changes"]
+}

@@ -1,0 +1,41 @@
+{
+  "observed_at": "2026-11-16T01:25:04Z",
+  "source_head": "bcde6bc97dbaddcfa3d25a338bfa3be31a49750f",
+  "observation_only": true,
+  "catalog": {
+    "complete": true,
+    "next_cursor": null,
+    "unique_runnable": [
+      {"name": "Default environment", "environment_config_id": "asenvcfg_base", "repositories": []}
+    ],
+    "unrunnable_names": ["SysOp", "cogignition/feed_forge"],
+    "duplicate_default_rows": 2
+  },
+  "task_tool": {
+    "model_field": "string; account entitlement unverified",
+    "reasoning_field": "thinking enum; selected model support required",
+    "target": "codexCloud with runnable environmentConfigId",
+    "unexposed_controls": ["speed", "workdir", "repository_revision", "network", "sandbox_permissions", "tool_allowlist", "hard_timeout", "idempotency_key", "completion_callback"],
+    "thread_status_read_verified": true,
+    "zero_timeout_wait_snapshot_verified": true,
+    "cloud_task_launched": false,
+    "actual_cloud_model_verified": false,
+    "environment_permissions_verified": false,
+    "completion_wake_verified": false
+  },
+  "mailbox": {
+    "pending": 0,
+    "subscriptions_observed": 1,
+    "subscription_expires_at": "2026-11-16T01:46:43.504Z",
+    "transport": "vpc",
+    "transport_reachable": true,
+    "note": "Existing mailbox callbacks and a past owning-dot nonce exchange do not verify cloud-task completion wake or future subscription renewal."
+  },
+  "source_protection": {
+    "main_branch_protection_read_status": 403,
+    "provider_message": "Upgrade to GitHub Pro or make this repository public to enable this feature.",
+    "enforced_owner_review_verified": false,
+    "codeowners_file_observed": false,
+    "note": "Do not infer protection from source control. Do not change the repository's visibility or plan."
+  }
+}
