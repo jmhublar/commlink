@@ -1,0 +1,47 @@
+default:
+    @just --list
+
+prototype-install:
+    cd cloudflare && npm ci --cache /tmp/commlink-npm-cache
+
+prototype-check:
+    cd cloudflare && npm run check
+
+prototype-build:
+    cd cloudflare && npm run build
+
+callback-transport-build:
+    cd cloudflare && node scripts/build-callback-gateway.mjs
+
+callback-transport-check: callback-transport-build
+    node --test callback-transport/*.test.mjs
+
+# Local image build only. Explicit existing OrbStack runtime; no push or deploy.
+callback-image-build: callback-transport-build
+    docker --context orbstack build --tag commlink-callback:hub300-review callback-transport
+
+# Eight-second synthetic test; no network, published port, host mount or lasting container.
+callback-image-check:
+    docker --context orbstack run --rm --name commlink-hub300-smoke --network none --read-only --cap-drop ALL --security-opt no-new-privileges --memory 256m --cpus 1 -i --entrypoint /usr/local/bin/commlink-HUB300 commlink-callback:hub300-review --input-type=module < callback-transport/smoke.mjs
+
+# Synthetic render only; no cluster connection or install.
+callback-chart-check:
+    helm lint charts/commlink-callback -f charts/commlink-callback/ci/test-values.yaml --strict
+    helm template commlink-callback charts/commlink-callback --namespace commlink -f charts/commlink-callback/ci/test-values.yaml > /dev/null
+    helm lint charts/commlink-callback -f charts/commlink-callback/ci/test-values.yaml --set authMode=vpc-network --set access.issuer= --set access.audience= --set access.serviceId= --strict
+    helm template commlink-callback charts/commlink-callback --namespace commlink -f charts/commlink-callback/ci/test-values.yaml --set authMode=vpc-network --set access.issuer= --set access.audience= --set access.serviceId= > /dev/null
+
+# Builds a local release artifact; does not publish or deploy.
+callback-chart-package destination="/tmp/commlink-chart": callback-chart-check
+    mkdir -p {{quote(destination)}}
+    helm package charts/commlink-callback --destination {{quote(destination)}}
+
+# Install proposal: supply reviewed nonsecret values. SysOp/Flux owns application.
+basestar-install-plan values:
+    helm template commlink-callback charts/commlink-callback --namespace commlink -f {{quote(values)}}
+
+# Publish only this reviewed image/chart to the existing local registry.
+callback-artifacts-publish:
+    docker --context orbstack tag commlink-callback:hub300-review localhost:5111/commlink-callback:a05d7bd
+    docker --context orbstack push localhost:5111/commlink-callback:a05d7bd
+    helm push /tmp/commlink-chart/commlink-callback-0.2.0.tgz oci://localhost:5111/helm --plain-http

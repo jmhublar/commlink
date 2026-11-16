@@ -1,0 +1,149 @@
+{
+  "account_id": "32b597c6685caac8796fc167932759d2",
+  "worker_name": "commlink-prototype",
+  "worker_id": "cdd6e08580d946cfbe332418d71cfe44",
+  "deployment_id": "77a313aa-7b8c-4282-8fea-438cfe3f515b",
+  "access_app_id": "84582df9-1583-4e5c-b0ec-770708c448d3",
+  "access_policy_id": "15c97385-4880-49d2-aa94-f0e2a4e4f67d",
+  "robut_access_policy_id": "3b442b88-3aab-4d92-a4a0-010705cc01e1",
+  "robut_service_token_id": "5fef3368-fc6d-4395-84c7-d9df23581024",
+  "identity_provider_id": "e13ece2f-54a4-4052-9892-c7374767484e",
+  "mcp_url": "https://commlink-prototype.joshua-m-hublar.workers.dev/mcp",
+  "plan": "Workers Free (confirmed by API)",
+  "status": "Private VPC gateway live; existing owning Dot native wake, exact nonce echo and Robut receipt demonstrated; one extra completion wake stopped without reply; no further native delivery observed for126seconds",
+  "metadata": {
+    "main_module": "worker.js",
+    "compatibility_date": "2026-07-30",
+    "bindings": [
+      {
+        "type": "durable_object_namespace",
+        "name": "MAILBOX",
+        "class_name": "Mailbox"
+      },
+      {
+        "type": "plain_text",
+        "name": "CHANNEL_ID",
+        "text": "hub-300-prototype"
+      },
+      {
+        "type": "plain_text",
+        "name": "ACCESS_ISSUER",
+        "text": "https://cogignition.cloudflareaccess.com"
+      },
+      {
+        "type": "plain_text",
+        "name": "ACCESS_AUD",
+        "text": "049d99676dd181a57bb5d580977368f8b304467399de197105056fb8401ecbb4"
+      },
+      {
+        "type": "plain_text",
+        "name": "IDENTITIES_JSON",
+        "text": "{\"email:hublar@proton.me\":\"openai\",\"common_name:4b54a821b2f848e1021e8611e6cacc53.access\":\"robut\",\"common_name:cb4a7504232b3dc998eda71143d0bfe2.access\":\"openai\"}"
+      },
+      {
+        "type": "plain_text",
+        "name": "CALLBACK_ORIGINS_JSON",
+        "text": "[\"https://connectors.api.openai.com\"]"
+      },
+      {
+        "type": "inherit",
+        "name": "GROK_WEBHOOK_URL"
+      },
+      {
+        "type": "inherit",
+        "name": "GROK_SENDER_KEY"
+      },
+      {
+        "type": "plain_text",
+        "name": "GROK_ENABLED",
+        "text": "true"
+      },
+      {
+        "type": "plain_text",
+        "name": "GROK_WEBHOOK_ORIGIN",
+        "text": "https://api2.cursor.sh"
+      },
+      {
+        "type": "plain_text",
+        "name": "GROK_AUTH_HEADER",
+        "text": "Authorization"
+      },
+      {
+        "type": "plain_text",
+        "name": "GROK_AUTH_SCHEME",
+        "text": "Bearer"
+      },
+      {
+        "type": "plain_text",
+        "name": "GROK_CONFIG_REVISION",
+        "text": "1"
+      },
+      {
+        "name": "CALLBACK_GATEWAY",
+        "type": "vpc_service",
+        "service_id": "01a1e172-f93b-7473-9f9f-3fc83a50d2ed"
+      },
+      {
+        "name": "CALLBACK_TRANSPORT_MODE",
+        "type": "plain_text",
+        "text": "vpc"
+      }
+    ],
+    "observability": {
+      "enabled": true,
+      "logs": {
+        "enabled": true,
+        "invocation_logs": false,
+        "head_sampling_rate": 0.1
+      }
+    },
+    "tags": [
+      "commlink",
+      "hub-300",
+      "prototype"
+    ]
+  },
+  "plugin": {
+    "id": "plugins_6af9fc8296c48191aeb72f02476d8fec",
+    "release_id": "pluginrel_6afa23e9b7f881919b8014ef54c275f8",
+    "version": "0.1.2",
+    "url": "https://chatgpt.com/plugins/plugins_6af9fc8296c48191aeb72f02476d8fec",
+    "scope": "USER",
+    "visibility": "PRIVATE",
+    "connection_status": "OAuth connected; four tools and commlink.message.created discovered in ChatGPT",
+    "connected_app_id": "asdk_app_6afa22b05dc88191a45a30e16dfde7ec",
+    "connected_app_plugin_id": "plugin_asdk_app_6afa22b05dc88191a45a30e16dfde7ec"
+  },
+  "oauth_registration": {
+    "dynamic_client_registration_enabled": true,
+    "allowed_redirect_uri": "https://chatgpt.com/connector/oauth/zdznSZvJxJYf",
+    "registration_endpoint": "https://cogignition.cloudflareaccess.com/cdn-cgi/access/oauth/registration",
+    "allow_any_on_localhost": false,
+    "allow_any_on_loopback": false,
+    "access_token_lifetime": "15m",
+    "grant_session_duration": "336h"
+  },
+  "gpt_access_policy_id": "6de17479-974e-47af-a84a-86784626e2d8",
+  "gpt_service_token_id": "c21d38e0-c844-4ce1-aa06-bfba641e3d18",
+  "deployed_commit": "7ca277b9238c08ce3a6e79123874fb1148b29c96",
+  "worker_version_id": "8b283d8f-c5e7-47f2-95bb-e1653dd01b1e",
+  "vpc_gateway": {
+    "service_id": "01a1e172-f93b-7473-9f9f-3fc83a50d2ed",
+    "tunnel_id": "80435c51-39b9-4d55-96fa-2936ff1345ad",
+    "target": "commlink-callback.commlink.svc.cluster.local:8080",
+    "namespace": "commlink",
+    "helm_release": "commlink-callback",
+    "chart_version": "0.2.0",
+    "chart_digest": "sha256:e733b94c89a866708016f594a69006da05607756810ab1b5b916cce232ce2f8a",
+    "image_digest": "sha256:814667b71b35bb950888e722db9d45d5edbc433f11aa0d2eebef07a11104829c",
+    "health_verified": true,
+    "isolation_verified": true
+  },
+  "native_acceptance": {
+    "correlation_id": "da893f39-2fd9-4dd4-84e2-14c7129ec3ea",
+    "challenge_message_id": "123c2996-b2bd-4bd1-82c1-deda8b27375f",
+    "echo_message_id": "fa710acc-b01a-4b85-b1e5-172410e4d9e2",
+    "evidence": "../docs/plans/hub-300/native-acceptance-2026-11-15.md",
+    "subscription_renewal_tested": false
+  }
+}

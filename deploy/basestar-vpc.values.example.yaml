@@ -1,0 +1,13 @@
+# Exploration only: no application JWT in this explicit private-network mode.
+# Requires effective tunnel-only NetworkPolicy and review of VPC Bind/Admin roles.
+authMode: vpc-network
+image:
+  repository: k3d-cogignition-registry:5111/commlink-callback
+  digest: REPLACE_WITH_REVIEWED_IMAGE_DIGEST
+access:
+  issuer: ""
+  audience: ""
+  serviceId: ""
+cloudflared:
+  namespace: cloudflared
+  podLabels: { app: cloudflared }

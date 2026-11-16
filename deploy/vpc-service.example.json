@@ -1,0 +1,12 @@
+{
+  "name": "commlink-callback-hub300",
+  "type": "http",
+  "http_port": 8080,
+  "https_port": null,
+  "host": {
+    "hostname": "commlink-callback.commlink.svc.cluster.local",
+    "resolver_network": {
+      "tunnel_id": "80435c51-39b9-4d55-96fa-2936ff1345ad"
+    }
+  }
+}

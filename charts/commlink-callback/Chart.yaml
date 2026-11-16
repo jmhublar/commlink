@@ -1,0 +1,6 @@
+apiVersion: v2
+name: commlink-callback
+description: HUB-300 authenticated gateway for pinned native MCP callbacks
+type: application
+version: 0.2.0
+appVersion: 0.2.0

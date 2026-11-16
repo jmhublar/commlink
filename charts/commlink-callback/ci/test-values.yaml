@@ -1,0 +1,7 @@
+image:
+  repository: example.invalid/synthetic-commlink
+  digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+access:
+  issuer: https://synthetic.cloudflareaccess.com
+  audience: synthetic-gateway-audience
+  serviceId: synthetic-service.access
