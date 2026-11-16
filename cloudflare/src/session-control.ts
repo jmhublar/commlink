@@ -1,6 +1,8 @@
 import {RpcError,exact,object,string,integer,uuid,canonical as mailboxCanonical,sha,type Identity,type Envelope} from './protocol';
 import {menu,sessionCanonical,sessionDigest,strictSessionJson,parseSessionRequest,selection,policyDecision,decision,RequestError,
   controlDigest,activationValid,type SessionConfiguration,type SessionRequest,type Decision} from './session-policy';
+import {CompletionRecovery} from './completion';
+import type {JobBinding} from './job-reports';
 
 type Row=Record<string,SqlStorageValue>;
 type Snapshot={config:SessionConfiguration;canonical:string;policyHash:string;menuHash:string;controlHash:string};
@@ -14,6 +16,7 @@ const toolError=(code:string)=>new RpcError(-32010,'Session control refused',{re
 /** Durable control plane only. This class has no fetch, cloud launch, policy
  * activation, credential handling or automatic re-launch capability. */
 export class SessionControl {
+  private completions:CompletionRecovery;
   constructor(private sql:SqlStorage,private transaction:<T>(f:()=>T)=>T,private configuration:()=>SessionConfiguration,
     private channel:string,private now=()=>Date.now()){
     sql.exec(`CREATE TABLE IF NOT EXISTS session_jobs(
@@ -25,6 +28,7 @@ export class SessionControl {
       CREATE TABLE IF NOT EXISTS session_launches(job_id TEXT PRIMARY KEY,attempted INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS session_status_outbox(id TEXT PRIMARY KEY,job_id TEXT NOT NULL,version INTEGER NOT NULL,
         envelope TEXT NOT NULL,created INTEGER NOT NULL,sent INTEGER,UNIQUE(job_id,version));`);
+    this.completions=new CompletionRecovery(sql,now);
   }
   private row(q:string,...p:SqlStorageValue[]){return this.sql.exec(q,...p).toArray()[0] as Row|undefined;}
   private rows(q:string,...p:SqlStorageValue[]){return this.sql.exec(q,...p).toArray() as Row[];}
@@ -129,13 +133,14 @@ export class SessionControl {
       else if(this.rateExceeded(s))d=decision('RATE_LIMITED',[],true,3600);
       if(d.code!=='ELIGIBLE')return {status:this.publicStatus(this.update(r,'held',d)),launch:null};
       if(this.row('SELECT job_id FROM session_slot WHERE id=1')?.job_id!==r.id)throw toolError('STATE_CONFLICT');
+      const completion=this.completions.ready(key,s.config.completion_owner_thread_id);
       const fence=crypto.randomUUID();this.sql.exec('INSERT INTO session_launches VALUES(?,?)',r.id,this.now());
       const next=this.update(r,'launch_pending',decision('LAUNCH_PENDING'),{fence});
       // This fenced intent is returned once only. A lost response must never be
       // retried into a second create_thread call, including after lease expiry.
       return {status:this.publicStatus(next),fence,launch:{target:{type:'codexCloud',environmentConfigId:s.config.profiles[req.environment].environment_config_id},
         model:selection(req).model,thinking:selection(req).effort,job:req.job,request_message_id:key,
-        policy_sha256:s.policyHash,control_sha256:s.controlHash,policy_epoch:s.config.activation!.epoch,approval_receipt:s.config.activation!.receipt_id,menu_sha256:s.menuHash,time_budget:req.time_budget}};
+        policy_sha256:s.policyHash,control_sha256:s.controlHash,policy_epoch:s.config.activation!.epoch,approval_receipt:s.config.activation!.receipt_id,menu_sha256:s.menuHash,time_budget:req.time_budget,completion:{...completion,job_id:r.id}}};
     });
   }
   transition(id:Identity,a:Record<string,unknown>){
@@ -148,29 +153,72 @@ export class SessionControl {
         if(r.state!=='launch_pending'||a.executor_id!==undefined||a.result!==undefined||a.evidence!==undefined)throw toolError('STATE_CONFLICT');
         return this.publicStatus(this.update(r,'launch_uncertain',decision('LAUNCH_UNCERTAIN')));
       }
-      const evidence=object(a.evidence);exact(evidence,['source','state']);
+      const evidence=object(a.evidence);exact(evidence,['source','state','turn_id'],['source','state']);
       if(typeof evidence.source!=='string'||!['create_thread','read_thread','wait_threads'].includes(evidence.source))throw toolError('EVIDENCE_REQUIRED');
       if(event==='failed'&&r.state==='launch_pending'&&evidence.source==='create_thread'&&evidence.state==='not_created'&&a.executor_id===undefined){
         const result=this.result(a.result,JSON.parse(String(r.request_json)) as SessionRequest);
+        this.completions.resolve(key,'not_created','create_thread');
         return this.publicStatus(this.update(r,'failed',decision('EXECUTOR_FAILED'),{result_json:JSON.stringify(result)}));
       }
       if(event==='submitted'){
         if(r.state!=='launch_pending'||evidence.source!=='create_thread'||evidence.state!=='created'||a.result!==undefined)throw toolError('STATE_CONFLICT');
         const executor=string(a.executor_id,160);if(!/^[a-zA-Z0-9_-]+$/.test(executor))throw new RpcError(-32602,'Invalid executor identifier');
+        this.completions.bindTask(key,executor);
         return this.publicStatus(this.update(r,'submitted',decision('SUBMITTED'),{executor_id:executor}));
       }
       if(a.executor_id!==r.executor_id||!r.executor_id||evidence.source==='create_thread')throw toolError('EVIDENCE_REQUIRED');
       if(event==='running'){
         if(r.state!=='submitted'||evidence.state!=='running'||a.result!==undefined)throw toolError('STATE_CONFLICT');
+        this.completions.observe(key,{executor_id:a.executor_id,turn_id:evidence.turn_id,source:evidence.source,state:'running'});
         return this.publicStatus(this.update(r,'started',decision('STARTED')));
       }
       if(event==='finished'||event==='failed'){
         if(!['submitted','started'].includes(String(r.state))||evidence.state!==event)throw toolError('STATE_CONFLICT');
         const result=this.result(a.result,JSON.parse(String(r.request_json)) as SessionRequest);
+        this.completions.assertTerminal(key,a.executor_id,evidence.turn_id);
+        this.completions.resolve(key,event,evidence.source as string);
         return this.publicStatus(this.update(r,event,decision(event==='finished'?'FINISHED':'EXECUTOR_FAILED'),{result_json:JSON.stringify(result)}));
       }
       throw new RpcError(-32602,'Invalid session transition');
     });
+  }
+  completionRegister(id:Identity,a:Record<string,unknown>){
+    this.coordinator(id);exact(a,['request_message_id','plan']);const key=idValue(a.request_message_id);
+    return this.transaction(()=>{const r=this.row('SELECT * FROM session_jobs WHERE request_message_id=?',key);
+      if(!r||r.state!=='accepted')throw toolError('STATE_CONFLICT');
+      return this.completions.register({request_message_id:key,correlation_id:String(r.correlation_id),owner_key:id.key},a.plan,this.configuration().completion_owner_thread_id);});
+  }
+  completionBind(id:Identity,a:Record<string,unknown>){
+    this.coordinator(id);exact(a,['request_message_id','executor_id','turn_id']);const key=idValue(a.request_message_id);
+    return this.transaction(()=>this.completions.bindTurn(key,a.executor_id,a.turn_id));
+  }
+  completionSignal(id:Identity,a:Record<string,unknown>){
+    this.coordinator(id);exact(a,['request_message_id','signal']);const key=idValue(a.request_message_id);
+    return this.transaction(()=>this.completions.signal(key,a.signal));
+  }
+  completionRecovery(id:Identity,a:Record<string,unknown>){
+    this.coordinator(id);exact(a,['limit'],[]);return this.completions.recovery(this.configuration().completion_owner_thread_id,integer(a.limit??20,1,50));
+  }
+  completionObserve(id:Identity,a:Record<string,unknown>){
+    this.coordinator(id);exact(a,['request_message_id','observation']);const key=idValue(a.request_message_id);
+    return this.transaction(()=>this.completions.observe(key,a.observation));
+  }
+  callbackOwner(id:Identity,a:Record<string,unknown>){
+    exact(a,['owner_thread_id']);const c=this.configuration(),owner=c.completion_owner_thread_id;
+    if(id.peer!=='openai'||!owner||a.owner_thread_id!==owner||(!c.coordinator_keys.includes(id.key)&&
+      !(c.callback_jobs??[]).some(b=>b.owner_key===id.key&&b.owner_thread_id===owner&&b.expires_at>this.now())))throw new RpcError(-32003,'Forbidden');
+    return owner;
+  }
+  callbackJob(key:string):JobBinding|null{
+    const c=this.configuration(),fixed=(c.callback_jobs??[]).filter(b=>b.job_id===key);
+    if(fixed.length>1)return null;
+    if(fixed.length)return fixed[0].owner_thread_id===c.completion_owner_thread_id&&!this.row('SELECT id FROM session_jobs WHERE id=?',key)?fixed[0]:null;
+    const r=this.row('SELECT j.*,s.owner_key AS callback_owner,s.owner_thread_id,s.plan_json,s.turn_id,s.resolved FROM session_jobs j JOIN session_completion s ON s.request_message_id=j.request_message_id WHERE j.id=?',key);
+    if(!r||!['launch_pending','submitted','started','finished','failed'].includes(String(r.state))||r.owner_thread_id!==c.completion_owner_thread_id||!c.coordinator_keys.includes(String(r.callback_owner)))return null;
+    const plan=JSON.parse(String(r.plan_json));if(plan.explicit_callback.mode!=='commlink_tool')return null;
+    return {job_id:key,owner_key:String(r.callback_owner),reporter_key:String(r.callback_owner),owner_thread_id:String(r.owner_thread_id),correlation_id:String(r.correlation_id),
+      request_message_id:String(r.request_message_id),executor_id:r.executor_id===null?null:String(r.executor_id),turn_id:r.turn_id===null?null:String(r.turn_id),
+      expires_at:plan.recovery.expires_at,approval_ref:String(r.approval_receipt),reconciled:r.resolved!==null};
   }
   private result(value:unknown,req:SessionRequest):Result{
     const p=object(value);exact(p,['summary','checks','limitations','artifacts']);

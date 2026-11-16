@@ -47,6 +47,14 @@ empty subscription list does not prove that a different OAuth principal has none
 
 ## Handling each wake or inbox check
 
+For a commlink.job.status_reported event, follow
+[job status hints](../../references/job-status-hints.md) and report-session-completion
+in this same owning dot. It is a separate native event, not a mailbox message:
+do not ack its event ID, manufacture a Robut envelope or accept its claimed
+status as provider evidence. Match the pre-recorded job/task/turn/root first.
+The new tool/event are source-only until their separate release and discovery.
+Use the mailbox flow below only for inbox events or requested inbox checks.
+
 Begin with `link_status` and `poll(since=0)` for recovery. Follow `next_since`
 while `has_more`, reading at most 100 messages in one turn and reporting any
 remaining backlog. Only this connection's own mailbox is readable.

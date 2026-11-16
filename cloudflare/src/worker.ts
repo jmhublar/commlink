@@ -3,8 +3,10 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { GrokWake, type GrokEnv } from './grok-wake';
 import { callbackPost, callbackHealth, type CallbackEnv } from './callback';
 import {SessionControl} from './session-control';
-import {inactiveSessionConfiguration,type SessionConfiguration} from './session-policy';
-import { EVENT, RpcError, object, exact, string, integer, peer, canonical, sha, equal, signingKey, signature, readBody, envelope, eventDefinition, tools, uuid, type Identity, type ObjectValue, type Peer } from './protocol';
+import {JobReports} from './job-reports';
+import {type SessionConfiguration} from './session-policy';
+import {callbackPilotConfiguration} from './callback-pilot';
+import { EVENT, JOB_EVENT, RpcError, object, exact, string, integer, peer, canonical, sha, equal, signingKey, signature, readBody, envelope, eventDefinition, jobEventDefinition, tools, uuid, type Identity, type ObjectValue, type Peer } from './protocol';
 
 // Configuration is supplied by deployment metadata; no request can select an issuer.
 export interface Env extends GrokEnv, CallbackEnv {
@@ -67,6 +69,7 @@ export class Mailbox extends DurableObject<Env> {
   private sql:SqlStorage;
   private grok:GrokWake;
   private sessions:SessionControl;
+  private jobReports:JobReports;
   constructor(ctx:DurableObjectState,env:Env) {
     super(ctx,env);this.sql=ctx.storage.sql;
     this.sql.exec(`
@@ -80,11 +83,12 @@ export class Mailbox extends DurableObject<Env> {
     `);
     this.grok=new GrokWake(ctx,env);
     this.sessions=new SessionControl(this.sql,f=>ctx.storage.transactionSync(f),()=>this.sessionConfiguration(),env.CHANNEL_ID);
+    this.jobReports=new JobReports(this.sql,f=>ctx.storage.transactionSync(f),key=>this.sessions.callbackJob(key));
   }
-  // Source-controlled and inactive. No runtime request can supply activation,
-  // coordinator identities or executor capabilities. Test subclasses use only
-  // isolated fixture configurations outside the deployed Worker bundle.
-  protected sessionConfiguration():SessionConfiguration{return inactiveSessionConfiguration;}
+  // Standing execution remains inactive. Only the source-controlled, expiring
+  // owner-approved callback pilot is enabled; requests cannot change this.
+  // Test subclasses supply isolated fixture snapshots outside this bundle.
+  protected sessionConfiguration():SessionConfiguration{return callbackPilotConfiguration;}
   private rows(query:string,...params:SqlStorageValue[]):SqlRow[]{return this.sql.exec(query,...params).toArray();}
   private row(query:string,...params:SqlStorageValue[]):SqlRow|undefined{return this.rows(query,...params)[0];}
   private rate(id:Identity,op:string) {
@@ -139,7 +143,7 @@ export class Mailbox extends DurableObject<Env> {
     }
     if(method==='ping')return {};
     if(method==='tools/list')return {tools};
-    if(method==='events/list')return {events:[eventDefinition(id.peer)]};
+    if(method==='events/list')return {events:[eventDefinition(id.peer),...(id.peer==='openai'?[jobEventDefinition()]:[])]};
     if(method==='events/subscribe')return this.subscribe(id,p);
     if(method==='events/unsubscribe')return this.unsubscribe(id,p);
     if(method==='tools/call') {
@@ -152,6 +156,10 @@ export class Mailbox extends DurableObject<Env> {
         else if(p.name==='poll')result=this.poll(id,a);
         else if(p.name==='ack')result=this.ack(id,a);
         else if(p.name==='link_status')result=await this.status(id,a);
+        else if(p.name==='job_report_status'){
+          if(id.peer!=='openai')throw new RpcError(-32003,'Job report is not authorized');
+          await this.ensureAlarm();result=this.jobReports.report(id,a);
+        }
         else if(p.name==='session_capabilities')result=await this.sessions.capabilities(a);
         else if(p.name==='session_validate')result=await this.sessions.validate(a);
         else if(p.name==='session_status')result=this.sessions.status(id,a);
@@ -163,6 +171,13 @@ export class Mailbox extends DurableObject<Env> {
         else if(p.name==='session_transition')result=this.sessions.transition(id,a);
         else if(p.name==='session_outbox')result=this.sessions.outbox(id,a);
         else if(p.name==='session_recovery')result=this.sessions.recovery(id,a);
+        else if(p.name==='session_completion_register')result=this.sessions.completionRegister(id,a);
+        else if(p.name==='session_completion_bind'){
+          result=this.sessions.completionBind(id,a);await this.ensureAlarm();this.jobReports.refreshRequest(String(a.request_message_id));
+        }
+        else if(p.name==='session_completion_signal')result=this.sessions.completionSignal(id,a);
+        else if(p.name==='session_completion_observe')result=this.sessions.completionObserve(id,a);
+        else if(p.name==='session_completion_recovery')result=this.sessions.completionRecovery(id,a);
         else if(p.name==='session_outbox_mark_sent')result=this.sessions.markSent(id,a,key=>{
           const r=this.row('SELECT envelope FROM messages WHERE id=? AND sender=\'openai\' AND recipient=\'robut\'',key);
           return r?JSON.parse(String(r.envelope)):null;
@@ -225,6 +240,7 @@ export class Mailbox extends DurableObject<Env> {
   private async status(id:Identity,a:ObjectValue) {
     exact(a,[]);
     return {self:id.peer,pending:Number(this.row('SELECT COUNT(*) AS n FROM messages WHERE recipient=? AND acked IS NULL AND expires>?',id.peer,Date.now())!.n),
+      ...this.jobReports.status(id),
       subscriptions:this.rows('SELECT id,expires FROM subscriptions WHERE owner=?',id.key),
       last_subscription_attempt:this.row('SELECT attempted,outcome,code,reason,callback_origin FROM subscription_attempts WHERE owner=? AND attempted>?',id.key,Date.now()-86400000)??null,
       deliveries:this.rows('SELECT o.id,o.message_id,o.status,o.attempts,o.last_http,o.last_error FROM outbox o JOIN subscriptions s ON o.sub_id=s.id WHERE s.owner=? ORDER BY o.due DESC LIMIT 30',id.key),
@@ -232,22 +248,27 @@ export class Mailbox extends DurableObject<Env> {
   }
   private async subscriptionIdentity(id:Identity,p:ObjectValue,withSecret:boolean) {
     exact(p,['name','arguments','delivery','cursor','ttlMs'],['name','arguments','delivery']);
-    if(p.name!==EVENT)throw new RpcError(-32602,'Unknown event');
-    const args=object(p.arguments);exact(args,['recipient']);
-    if(peer(args.recipient)!==id.peer)throw new RpcError(-32003,'Wrong recipient');
+    const job=p.name===JOB_EVENT;if(!job&&p.name!==EVENT)throw new RpcError(-32602,'Unknown event');
+    const args=object(p.arguments);let ownerThread:string|null=null;
+    if(job){
+      if(withSecret)ownerThread=this.sessions.callbackOwner(id,args);
+      else {exact(args,['owner_thread_id']);if(id.peer!=='openai')throw new RpcError(-32003,'Forbidden');ownerThread=string(args.owner_thread_id,160);}
+    }
+    else {exact(args,['recipient']);if(peer(args.recipient)!==id.peer)throw new RpcError(-32003,'Wrong recipient');}
     const delivery=object(p.delivery);exact(delivery,withSecret?['mode','url','secret']:['mode','url'],withSecret?['mode','url','secret']:['mode','url']);
     if(delivery.mode!=='webhook')throw new RpcError(-32602,'Only webhook delivery is supported');
     const url=callbackUrl(delivery.url,this.env);
-    const subId='sub_'+await sha(canonical([id.key,url,EVENT,args]));
-    return {subId,url,delivery};
+    const subId='sub_'+await sha(canonical([id.key,url,p.name,args]));
+    return {subId,url,delivery,job,ownerThread};
   }
+  private subscriptionCount(key:string){return Number(this.row('SELECT (SELECT COUNT(*) FROM subscriptions WHERE owner=?)+(SELECT COUNT(*) FROM job_subscriptions WHERE owner=?) AS n',key,key)!.n);}
   private async subscribe(id:Identity,p:ObjectValue) {
-    const {subId,url,delivery}=await this.subscriptionIdentity(id,p,true);
+    const {subId,url,delivery,job,ownerThread}=await this.subscriptionIdentity(id,p,true),table=job?'job_subscriptions':'subscriptions';
     const secret=string(delivery.secret,128);signingKey(secret);
     if(p.cursor!=null)throw new RpcError(-32602,'Replay cursor is unsupported; recover through poll');
     const ttl=p.ttlMs==null?3600000:Math.min(integer(p.ttlMs,1,Number.MAX_SAFE_INTEGER),86400000);
-    const existing=this.row('SELECT * FROM subscriptions WHERE id=?',subId);
-    if(!existing && Number(this.row('SELECT COUNT(*) AS n FROM subscriptions WHERE owner=?',id.key)!.n)>=5)throw new RpcError(-32000,'Subscription limit reached');
+    const existing=this.row(`SELECT * FROM ${table} WHERE id=?`,subId);
+    if(!existing && this.subscriptionCount(id.key)>=5)throw new RpcError(-32000,'Subscription limit reached');
     const now=Date.now();
     let verified=Number(existing?.verified??0);
     if(!existing || existing.url!==url || !equal(String(existing.secret),secret) || now-Number(existing.verified)>300000) {
@@ -264,21 +285,24 @@ export class Mailbox extends DurableObject<Env> {
     return this.ctx.storage.transactionSync(()=>{
       // Callback verification and alarm scheduling allow other subscriptions to
       // commit. Read the current row and enforce the cap atomically with insert.
-      const current=this.row('SELECT * FROM subscriptions WHERE id=?',subId);
-      if(!current && Number(this.row('SELECT COUNT(*) AS n FROM subscriptions WHERE owner=?',id.key)!.n)>=5)throw new RpcError(-32000,'Subscription limit reached');
+      if(job)this.sessions.callbackOwner(id,object(p.arguments));
+      if(job&&this.row('SELECT id FROM job_subscriptions WHERE owner=? AND owner_thread_id=? AND id<>? AND expires>?',id.key,ownerThread,subId,Date.now()))throw new RpcError(-32003,'Completion watch is already bound');
+      const current=this.row(`SELECT * FROM ${table} WHERE id=?`,subId);
+      if(!current && this.subscriptionCount(id.key)>=5)throw new RpcError(-32000,'Subscription limit reached');
       const committed=Date.now();
       const old=current&&current.secret!==secret?String(current.secret):current?.previous_secret??null;
       const rotation=current&&current.secret!==secret?committed+120000:current?.rotation_until??null;
       // Refreshing expiry does not renew the callback's cached proof of control.
-      this.sql.exec('INSERT INTO subscriptions(id,owner,peer,url,secret,previous_secret,rotation_until,expires,verified) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET secret=excluded.secret,previous_secret=excluded.previous_secret,rotation_until=excluded.rotation_until,expires=excluded.expires,verified=excluded.verified',subId,id.key,id.peer,url,secret,old,rotation,committed+ttl,verified);
+      if(job)this.sql.exec('INSERT INTO job_subscriptions(id,owner,peer,owner_thread_id,url,secret,previous_secret,rotation_until,expires,verified) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET secret=excluded.secret,previous_secret=excluded.previous_secret,rotation_until=excluded.rotation_until,expires=excluded.expires,verified=excluded.verified',subId,id.key,id.peer,ownerThread,url,secret,old,rotation,committed+ttl,verified);
+      else this.sql.exec('INSERT INTO subscriptions(id,owner,peer,url,secret,previous_secret,rotation_until,expires,verified) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET secret=excluded.secret,previous_secret=excluded.previous_secret,rotation_until=excluded.rotation_until,expires=excluded.expires,verified=excluded.verified',subId,id.key,id.peer,url,secret,old,rotation,committed+ttl,verified);
       return {id:subId,refreshBefore:iso(committed+ttl),cursor:null,truncated:false};
     });
   }
   private async unsubscribe(id:Identity,p:ObjectValue) {
-    const {subId}=await this.subscriptionIdentity(id,p,false);
+    const {subId,job}=await this.subscriptionIdentity(id,p,false),table=job?'job_subscriptions':'subscriptions',outbox=job?'job_hint_outbox':'outbox';
     this.ctx.storage.transactionSync(()=>{
-      this.sql.exec("UPDATE outbox SET status='cancelled',last_error='unsubscribed' WHERE sub_id=? AND status='pending'",subId);
-      this.sql.exec('DELETE FROM subscriptions WHERE id=? AND owner=?',subId,id.key);
+      this.sql.exec(`UPDATE ${outbox} SET status='cancelled',last_error='unsubscribed' WHERE sub_id=? AND status='pending'`,subId);
+      this.sql.exec(`DELETE FROM ${table} WHERE id=? AND owner=?`,subId,id.key);
     });return {};
   }
   async alarm() {
@@ -306,6 +330,11 @@ export class Mailbox extends DurableObject<Env> {
       this.sql.exec("UPDATE outbox SET status=?,attempts=?,due=?,last_http=?,last_error=? WHERE id=? AND status='pending'",state,attempts,due,status||null,error||(!accepted?'http_error':null),job.id);
       console.log(JSON.stringify({event:'delivery',event_id:job.id,status:state,http_status:status||null,attempts}));
     }
+    await this.jobReports.run((sub,eventId,body)=>webhook(this.env,callbackUrl(sub.url,this.env),String(sub.secret),eventId,String(sub.id),body,
+      Number(sub.rotation_until)>Date.now()?String(sub.previous_secret):undefined),sub=>{
+      if(!authorized(this.env,{peer:'openai',key:String(sub.owner)}))return false;
+      try{this.sessions.callbackOwner({peer:'openai',key:String(sub.owner)},{owner_thread_id:sub.owner_thread_id});return true;}catch{return false;}
+    });
     const now=Date.now();
     this.sql.exec('DELETE FROM limits WHERE expires<?',now);
     this.sql.exec('DELETE FROM subscription_attempts WHERE attempted<?',now-86400000);
@@ -318,7 +347,7 @@ export class Mailbox extends DurableObject<Env> {
     this.grok.cleanup();
     const next=this.row("SELECT MIN(t) AS due FROM (SELECT due AS t FROM outbox WHERE status='pending' UNION ALL SELECT expires AS t FROM subscriptions UNION ALL SELECT expires+604800000 AS t FROM messages)")?.due;
     const grokNext=this.grok.nextDue();
-    const due=Math.min(next!==null&&next!==undefined?Number(next):Infinity,grokNext??Infinity);
+    const due=Math.min(next!==null&&next!==undefined?Number(next):Infinity,grokNext??Infinity,this.jobReports.nextDue()??Infinity);
     if(Number.isFinite(due))await this.ctx.storage.setAlarm(Math.max(now+100,due));
     else await this.ctx.storage.deleteAlarm();
   }

@@ -9,6 +9,13 @@ repository discovery; a saved prompt cannot make missing tools appear.
 > [exact threadId/hostId, relevant turn/request/correlation, approved scope].
 > Record this native scheduler event and verify the current owner matches
 > [actual owning thread]. Retrieve provider status with read_thread/wait_threads;
+> For a registered completion contract, verify the actual automation/run identity
+> and record this scheduled_recovery hint with session_completion_signal. Read
+> session_completion_recovery; reconcile only its recorded task and bound turn.
+> Persist nonterminal/unknown lookups with session_completion_observe and respect
+> the saved finite check count/expiry. Unknown launches retain their reservation;
+> do not invent a task ID or create a replacement. A callback hint is not provider
+> completion. Include the bound turn_id in terminal transition evidence.
 > do not infer success from idle or task creation. For a registered Robut job,
 > use report-session-completion to durably record finished/failed and send the
 > stable session_outbox envelope to Robut only within the genuine reporting
