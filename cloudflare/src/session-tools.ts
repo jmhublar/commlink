@@ -2,10 +2,10 @@ const obj=(properties:Record<string,unknown>,required=Object.keys(properties))=>
 const text={type:'string'},id={type:'string',format:'uuid'},version={type:'integer',minimum:1};
 const tool=(name:string,description:string,inputSchema:unknown,readOnlyHint=false)=>({name,description,inputSchema,
   annotations:{readOnlyHint,destructiveHint:false,openWorldHint:false}});
-const completionPlan=obj({owner_thread_id:text,explicit_callback:obj({mode:{type:'string',enum:['thread_message','unavailable']},tool_name:{type:['string','null']}}),
+const completionPlan=obj({owner_thread_id:text,explicit_callback:obj({mode:{type:'string',enum:['thread_message','commlink_tool','unavailable']},tool_name:{type:['string','null']}}),
   platform_push:{type:'string',enum:['declared','unavailable']},recovery:obj({automation_id:text,owner_thread_id:text,kind:{type:'string',enum:['one_shot','recurring']},
     due_at:{type:'integer',minimum:0},expires_at:{type:'integer',minimum:0},max_checks:{type:'integer',minimum:1,maximum:24},cadence_seconds:{type:['integer','null'],minimum:3600}})});
-const completionSignal=obj({event_id:text,source:{type:'string',enum:['explicit_child','platform_push','scheduled_recovery']},owner_thread_id:text,
+const completionSignal=obj({event_id:text,source:{type:'string',enum:['explicit_child','commlink_hint','platform_push','scheduled_recovery']},owner_thread_id:text,
   executor_id:{type:['string','null']},correlation_id:id,sender_thread_id:{type:['string','null']},automation_id:{type:['string','null']}});
 const completionObservation=obj({executor_id:text,turn_id:text,source:{type:'string',enum:['read_thread','wait_threads']},state:{type:'string',enum:['running','attention','unknown']}});
 export const sessionTools=[

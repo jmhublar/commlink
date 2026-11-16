@@ -3,10 +3,10 @@
 Every delegated job needs a path back to the singular owning dot. This source
 contract adds persistent coordination and host instructions; it does not install
 a callback receiver, create a scheduler or repair the provider's notification
-service. The five new session_completion_* tools are not live until separately
+service. The new session_completion_* tools and job-report tool/event are not live until separately
 released. Standing permissions remain inactive.
 
-## Three distinct triggers
+## Distinct triggers
 
 1. **Explicit child callback:** when the child has a supported parent-message
    tool and actual direct-owner permission, it sends one minimal completion hint
@@ -20,6 +20,10 @@ released. Standing permissions remain inactive.
    precedes the provider's terminal state. This is polling with scheduler delay.
 
 Never describe any of these as another. No trigger proves success on its own.
+The additional [CommLink status hint](job-status-hints.md) route reuses existing
+OpenAI connector authentication. It has a distinct commlink_tool plan mode and
+commlink_hint signal source, with a dedicated commlink.job.status_reported event.
+It does not require the unavailable parent-message tool or a new credential.
 
 ## Before launch
 
@@ -44,9 +48,10 @@ session_prepare_launch. Exact arguments are described by tools/list:
 
 - request_message_id: actual persisted Robut request UUID.
 - plan.owner_thread_id: exact verified existing root thread ID.
-- plan.explicit_callback: {mode: thread_message | unavailable, tool_name: exact
+- plan.explicit_callback: {mode: thread_message | commlink_tool | unavailable, tool_name: exact
   discovered host alias | null}. Use unavailable if support/permission is not
-  established; do not invent a tool or grant the child coordinator credentials.
+  established; commlink_tool requires job_report_status. Do not invent a tool
+  or grant the child coordinator credentials. Its matching root watch must exist.
 - plan.platform_push: declared | unavailable. Declared means an upstream promise,
   never a claim that notification was observed.
 - plan.recovery: automation_id, owner_thread_id, kind (one_shot | recurring),
@@ -103,7 +108,7 @@ the recorded task/direct child of this root. Then session_completion_signal
 accepts request_message_id and a closed signal object:
 
 - event_id: stable actual host event/message/run ID.
-- source: explicit_child | platform_push | scheduled_recovery.
+- source: explicit_child | commlink_hint | platform_push | scheduled_recovery.
 - owner_thread_id, executor_id, correlation_id: stored bindings.
 - sender_thread_id: actual child ID for explicit_child; otherwise null.
 - automation_id: actual saved root schedule ID for scheduled_recovery;

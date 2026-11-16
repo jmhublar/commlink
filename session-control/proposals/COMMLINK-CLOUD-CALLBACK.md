@@ -1,7 +1,9 @@
 # Cloud child to owning dot through CommLink — evaluated proposal
 
-This is a design and test plan, not a deployed tool, credential grant, live
-subscription or standing authorization. Runtime source is unchanged by it.
+This records the evaluated design and live test plan. The tool/event are now
+implemented and tested in source; they are not deployed, a credential grant, a
+live subscription or standing authorization. See the maintained
+[runtime contract](../../cloudflare/plugin/commlink-prototype/references/job-status-hints.md).
 
 ## Direct evidence
 
@@ -68,7 +70,7 @@ Add a truthful completion event and a narrowly scoped hint tool instead.
 ## Proposed tool and server authorization
 
 Logical MCP name: job_report_status. The closed input contract is
-[job-report-status.v1.schema.json](job-report-status.v1.schema.json).
+[job-report-status.v1.schema.json](../schemas/job-report-status.v1.schema.json).
 Inputs are exactly job_id (registered UUID) and status (finished | failed).
 These are untrusted terminal-status claims. V1 does not accept arbitrary text,
 results, artifacts, recipient, owner thread, callback URL, credential, policy,
@@ -136,16 +138,15 @@ the genuine job authorization applies. A directly approved pilot must retain its
 own provenance; do not fabricate a Robut request to force it through admission.
 HTTP receipt, signed callback acceptance, actual root wake, provider completion,
 Robut mailbox acceptance and Robut acknowledgment are separate evidence gates.
-The source CompletionRecovery prototype currently recognizes explicit_child,
-platform_push and scheduled_recovery. Add a distinct commlink_hint source and
-commlink_tool callback mode during implementation; do not mislabel this new
-transport to force it through the existing three-source contract.
+CompletionRecovery now includes a distinct commlink_hint source and commlink_tool
+callback mode alongside explicit_child, platform_push and scheduled_recovery.
+Do not mislabel this transport as another trigger type.
 
 ## Implementation and test sequence
 
 1. Recover the principal-comparison result; do not resend an uncertain audit.
-2. Implement the closed tool, trusted job registry binding and dedicated native
-   event/outbox with default-off registration. Isolated tests cover same/foreign
+2. The closed tool, trusted job registry binding and dedicated native event/outbox
+   are implemented with default-off registration. Isolated tests cover same/foreign
    identity, unknown job, extra fields, expiry, early hint, restart/duplicate,
    conflicting status, replay after terminal, callback retry and no reply loop.
 3. Review the exact code and callback-only pilot record. Obtain action-time

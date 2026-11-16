@@ -66,6 +66,11 @@ separately from declared platform push. A worker-bound schedule or task creation
 receipt is not callback delivery evidence. Launch now refuses a missing, wrong-root
 or stale completion contract. Root-bound recovery is required even when the host
 promises terminal notifications.
+Prefer the [CommLink hint route](../../references/job-status-hints.md) where the
+child's actual authenticated connector exposes job_report_status. Register
+explicit_callback {mode: commlink_tool, tool_name: job_report_status}. Verify the
+root's separate commlink.job.status_reported watch and its saved thread/lease;
+preparation refuses a missing matching watch. Do not create it in the child.
 
 For accepted work only, call session_prepare_launch once with the current status
 version. It rechecks policy/menu/profile/expiry, consumes the hourly launch
@@ -92,6 +97,10 @@ being tested. Pass actual owner authorization evidence through supported trusted
 host context. A parent's assertion alone cannot satisfy a messaging tool's
 requirement for direct human permission. With no supported authorized child tool,
 record unavailable and rely on the required bounded root recovery.
+For commlink_tool, the narrow allowed action is job_report_status with the exact
+launch.completion.job_id and a finished/failed hint. Do not confuse that ID with
+the request or provider task ID. The child uses existing connector authentication;
+no raw credential is passed. Same OAuth identity is not job isolation.
 
 Record submitted with the actual returned threadId using session_transition,
 current version and fence. A clientThreadId alone is setup-pending, not a thread
@@ -117,6 +126,9 @@ only after checking actual host sender/recipient/event metadata; callback JSON
 cannot authenticate its own claimed sender. Reconcile exact provider state; hints
 alone never mark completion. For nonterminal/unknown observations use
 session_completion_observe, preserving the active reservation and recovery limit.
+Record native CommLink job events as commlink_hint, with null sender_thread_id
+and automation_id, after matching the stored hint/event and trusted host trigger.
+They are not authenticated direct-child messages or platform terminal push.
 
 ## Durable reporting
 

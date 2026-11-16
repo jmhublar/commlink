@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://commlink.invalid/proposals/job-report-status.v1.schema.json",
-  "title": "Proposed job_report_status arguments; not a deployed tool",
+  "$id": "https://commlink.invalid/schemas/job-report-status.v1.schema.json",
+  "title": "job_report_status hint arguments",
   "type": "object",
   "properties": {
     "job_id": {

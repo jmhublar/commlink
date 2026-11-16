@@ -24,7 +24,7 @@ mechanism. That approval/control-plane path requires review before activation.
 There is no cloud credentials handler, `fetch`, provider launcher, polling loop,
 watcher, cancellation, retry-reset or privilege-changing action in the control
 module. Plugin version 0.3.0 and the original coordinator tools were released;
-the next 0.4.0 completion-contract source is not installed or deployed here.
+the next 0.5.0 completion and CommLink hint source is not installed or deployed here.
 
 ## Menu and wire contract
 
@@ -147,6 +147,21 @@ remains in the existing callback ingress path. No new dot, watcher, connection,
 account, service identity or network route is created here.
 
 ## Completion wake and reporting
+
+The [job status hint tool/event](../cloudflare/plugin/commlink-prototype/references/job-status-hints.md)
+uses existing authenticated openai access. job_report_status accepts only a
+pre-recorded job_id and finished/failed claim. It queues a dedicated signed
+commlink.job.status_reported event, never a forged mailbox message or a provider
+terminal transition. Ordinary self-send remains invalid. Root completion watches
+are separately authorized, principal-scoped and combined with mailbox watches
+under the existing five-subscription cap. Same OAuth is not job isolation.
+Trusted callback_jobs records permit an explicitly approved callback-only pilot
+while standing execution remains inactive; the array is empty by default and
+has no request/API/environment activation path. This snapshot is not a verifier
+of human approval. Actual record/release provenance must be established by the
+owner before deployment. Dynamic bindings come only from legitimately admitted
+sessions with a commlink_tool plan and the recorded task/turn. All results still
+require independent provider verification; bounded root recovery remains required.
 
 The [completion contract](../cloudflare/plugin/commlink-prototype/references/completion-contract.md)
 now requires a persisted verified owning-root destination and bounded saved

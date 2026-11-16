@@ -2,6 +2,7 @@ import {RpcError,exact,object,string,integer,uuid,canonical as mailboxCanonical,
 import {menu,sessionCanonical,sessionDigest,strictSessionJson,parseSessionRequest,selection,policyDecision,decision,RequestError,
   controlDigest,activationValid,type SessionConfiguration,type SessionRequest,type Decision} from './session-policy';
 import {CompletionRecovery} from './completion';
+import type {JobBinding} from './job-reports';
 
 type Row=Record<string,SqlStorageValue>;
 type Snapshot={config:SessionConfiguration;canonical:string;policyHash:string;menuHash:string;controlHash:string};
@@ -139,7 +140,7 @@ export class SessionControl {
       // retried into a second create_thread call, including after lease expiry.
       return {status:this.publicStatus(next),fence,launch:{target:{type:'codexCloud',environmentConfigId:s.config.profiles[req.environment].environment_config_id},
         model:selection(req).model,thinking:selection(req).effort,job:req.job,request_message_id:key,
-        policy_sha256:s.policyHash,control_sha256:s.controlHash,policy_epoch:s.config.activation!.epoch,approval_receipt:s.config.activation!.receipt_id,menu_sha256:s.menuHash,time_budget:req.time_budget,completion}};
+        policy_sha256:s.policyHash,control_sha256:s.controlHash,policy_epoch:s.config.activation!.epoch,approval_receipt:s.config.activation!.receipt_id,menu_sha256:s.menuHash,time_budget:req.time_budget,completion:{...completion,job_id:r.id}}};
     });
   }
   transition(id:Identity,a:Record<string,unknown>){
@@ -185,7 +186,7 @@ export class SessionControl {
     this.coordinator(id);exact(a,['request_message_id','plan']);const key=idValue(a.request_message_id);
     return this.transaction(()=>{const r=this.row('SELECT * FROM session_jobs WHERE request_message_id=?',key);
       if(!r||r.state!=='accepted')throw toolError('STATE_CONFLICT');
-      return this.completions.register({request_message_id:key,correlation_id:String(r.correlation_id)},a.plan,this.configuration().completion_owner_thread_id);});
+      return this.completions.register({request_message_id:key,correlation_id:String(r.correlation_id),owner_key:id.key},a.plan,this.configuration().completion_owner_thread_id);});
   }
   completionBind(id:Identity,a:Record<string,unknown>){
     this.coordinator(id);exact(a,['request_message_id','executor_id','turn_id']);const key=idValue(a.request_message_id);
@@ -201,6 +202,23 @@ export class SessionControl {
   completionObserve(id:Identity,a:Record<string,unknown>){
     this.coordinator(id);exact(a,['request_message_id','observation']);const key=idValue(a.request_message_id);
     return this.transaction(()=>this.completions.observe(key,a.observation));
+  }
+  callbackOwner(id:Identity,a:Record<string,unknown>){
+    exact(a,['owner_thread_id']);const c=this.configuration(),owner=c.completion_owner_thread_id;
+    if(id.peer!=='openai'||!owner||a.owner_thread_id!==owner||(!c.coordinator_keys.includes(id.key)&&
+      !(c.callback_jobs??[]).some(b=>b.owner_key===id.key&&b.owner_thread_id===owner&&b.expires_at>this.now())))throw new RpcError(-32003,'Forbidden');
+    return owner;
+  }
+  callbackJob(key:string):JobBinding|null{
+    const c=this.configuration(),fixed=(c.callback_jobs??[]).filter(b=>b.job_id===key);
+    if(fixed.length>1)return null;
+    if(fixed.length)return fixed[0].owner_thread_id===c.completion_owner_thread_id&&!this.row('SELECT id FROM session_jobs WHERE id=?',key)?fixed[0]:null;
+    const r=this.row('SELECT j.*,s.owner_key AS callback_owner,s.owner_thread_id,s.plan_json,s.turn_id,s.resolved FROM session_jobs j JOIN session_completion s ON s.request_message_id=j.request_message_id WHERE j.id=?',key);
+    if(!r||!['launch_pending','submitted','started','finished','failed'].includes(String(r.state))||r.owner_thread_id!==c.completion_owner_thread_id||!c.coordinator_keys.includes(String(r.callback_owner)))return null;
+    const plan=JSON.parse(String(r.plan_json));if(plan.explicit_callback.mode!=='commlink_tool')return null;
+    return {job_id:key,owner_key:String(r.callback_owner),reporter_key:String(r.callback_owner),owner_thread_id:String(r.owner_thread_id),correlation_id:String(r.correlation_id),
+      request_message_id:String(r.request_message_id),executor_id:r.executor_id===null?null:String(r.executor_id),turn_id:r.turn_id===null?null:String(r.turn_id),
+      expires_at:plan.recovery.expires_at,approval_ref:String(r.approval_receipt),reconciled:r.resolved!==null};
   }
   private result(value:unknown,req:SessionRequest):Result{
     const p=object(value);exact(p,['summary','checks','limitations','artifacts']);

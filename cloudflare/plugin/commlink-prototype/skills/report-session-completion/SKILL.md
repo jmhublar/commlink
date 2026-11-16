@@ -17,6 +17,13 @@ new source-only tools. Record whether an explicit child message, platform push,
 scheduled recovery or manual prompt actually resumed this root. Verify trusted
 host sender and destination metadata, then register an actual hint with
 session_completion_signal. Never trust the hint's claimed identity as proof.
+For a native commlink.job.status_reported event, use the
+[job status hint contract](../../references/job-status-hints.md). Match its
+server-bound job, root, correlation, provider task and turn. For a registered
+session record source commlink_hint with null sender_thread_id/automation_id;
+the server requires the stored hint event. For a direct approved pilot, preserve
+its own record rather than fabricating a Robut request. A finished claim may
+precede the actual terminal turn: read the provider and retain bounded recovery.
 
 ## Recover the existing job
 

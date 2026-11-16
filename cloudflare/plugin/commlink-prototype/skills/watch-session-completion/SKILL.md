@@ -8,6 +8,9 @@ schedule is the wake source; this skill is its workflow. Read
 [host capabilities](../../references/host-capabilities.md) before choosing tools.
 Mailbox events and completion rechecks are separate subscriptions/tasks.
 Follow the [completion contract](../../references/completion-contract.md).
+The [CommLink job-hint event](../../references/job-status-hints.md) is a separate
+callback path. It complements this bounded recovery schedule; it does not prove
+the provider turn is terminal or remove recovery for missing/early hints.
 
 ## Bind the owner and scope first
 

@@ -9,9 +9,10 @@ import {tmpdir} from 'node:os';
 import {Miniflare,Log,LogLevel} from 'miniflare';
 import Ajv2020 from 'ajv/dist/2020.js';
 
-const code=await build({entryPoints:['src/session-control.ts','src/session-policy.ts'],bundle:true,platform:'node',format:'esm',outdir:'dist/session-unit',write:false});
+const code=await build({entryPoints:['src/session-control.ts','src/session-policy.ts','src/job-reports.ts'],bundle:true,platform:'node',format:'esm',outdir:'dist/session-unit',write:false});
 const modules=await Promise.all(code.outputFiles.map(f=>import('data:text/javascript;base64,'+Buffer.from(f.text).toString('base64'))));
 const {SessionControl}=modules.find(m=>m.SessionControl);
+const {JobReports}=modules.find(m=>m.JobReports);
 const {menu,sessionDigest,sessionCanonical,controlDigest,parseSessionRequest,strictSessionJson,inactiveSessionConfiguration}=modules.find(m=>m.menu);
 const dot={peer:'openai',key:'sub:dot'},other={peer:'openai',key:'sub:other'},robut={peer:'robut',key:'sub:robut'};
 const BASE=2_000_000_000_000;
@@ -29,10 +30,11 @@ const completionPlan=(now=BASE)=>({owner_thread_id:'synthetic-owning-root',expli
   recovery:{automation_id:'synthetic-root-schedule',owner_thread_id:'synthetic-owning-root',kind:'one_shot',due_at:now+60000,expires_at:now+300000,max_checks:1,cadence_seconds:null}});
 async function fixture(t,{config=approvedFixture(),database,autoCompletion=true}={}){
   if(!database){const dir=await mkdtemp(join(tmpdir(),'commlink-session-unit-'));database=join(dir,'state.sqlite');t.after(()=>rm(dir,{recursive:true,force:true}));}
-  let now=BASE;const messages=new Map();let db,control;
+  let now=BASE;const messages=new Map();let db,control,reports;
   const start=()=>{db=new DatabaseSync(database);const sql={exec(q,...params){let rows=[];if(!params.length&&q.includes(';'))db.exec(q);else rows=db.prepare(q).all(...params);return {toArray:()=>rows};}};
     const transaction=f=>{db.exec('BEGIN IMMEDIATE');try{const x=f();db.exec('COMMIT');return x;}catch(e){db.exec('ROLLBACK');throw e;}};
-    control=new SessionControl(sql,transaction,()=>config,'synthetic-channel',()=>now);};
+    control=new SessionControl(sql,transaction,()=>config,'synthetic-channel',()=>now);
+    reports=new JobReports(sql,transaction,key=>control.callbackJob(key),()=>now);};
   const approve=async()=>{config.activation={policy_sha256:await sessionDigest('commlink.policy.v1',config.policy),control_sha256:await controlDigest(config),owner_receipt_verified:true,receipt_id:'synthetic-owner-receipt',epoch:1,expires_at:BASE+86400000};};
   if(config.policy.state==='active')await approve();start();t.after(()=>db.close());
   const req=async(patch={})=>{const caps=await control.capabilities({});return {kind:'session_request',schema_version:1,menu_version:caps.menu_version,menu_sha256:caps.menu_sha256,expected_policy_sha256:caps.active_policy.sha256,
@@ -45,7 +47,8 @@ async function fixture(t,{config=approvedFixture(),database,autoCompletion=true}
   const transition=(s,fence,event,extra={})=>{if(['running','finished','failed'].includes(event)&&extra.executor_id)extra={...extra,evidence:{turn_id:'synthetic-turn',...extra.evidence}};
     const next=control.transition(dot,{request_message_id:s.request_message_id,expected_version:s.status_seq,fence,event,...extra});
     if(event==='submitted')control.completionBind(dot,{request_message_id:s.request_message_id,executor_id:extra.executor_id,turn_id:'synthetic-turn'});return next;};
-  return {get control(){return control;},config,approve,req,put,receive,prepare,transition,messages,advance:ms=>{now+=ms;},
+  return {get control(){return control;},get reports(){return reports;},config,approve,req,put,receive,prepare,transition,messages,advance:ms=>{now+=ms;},
+    seedJobWatch:()=>db.prepare('INSERT INTO job_subscriptions(id,owner,peer,owner_thread_id,url,secret,expires,verified) VALUES(?,?,?,?,?,?,?,?)').run('synthetic-job-watch',dot.key,'openai','synthetic-owning-root','https://callback.example/root','synthetic',BASE+3600000,BASE),
     restart:()=>{db.close();start();},get rows(){return db.prepare('SELECT * FROM session_jobs').all();}};
 }
 const result={summary:'Synthetic design completed',checks:['Compared boundaries'],limitations:[],artifacts:[]};
@@ -289,6 +292,51 @@ test('recurring recovery consumes finite hourly checks and provider failure prod
   assert.equal(next.state,'failed');f.restart();assert.equal(f.control.completionRecovery(dot,{}).contracts[0].terminal.state,'failed');
   assert.equal(f.control.completionSignal(dot,{request_message_id:e.message_id,signal:sig}).duplicate,true);
   assert.equal(f.control.outbox(dot,{}).messages.filter(m=>JSON.parse(m.payload.body).state==='failed').length,1);assert.equal(f.control.recovery(dot,{}).jobs.length,0);
+});
+
+test('CommLink callback contract requires its root watch and binds early hints to the actual task/turn without completing the job',async t=>{
+  const f=await fixture(t,{autoCompletion:false}),e=await f.put(),s=await f.receive(e),plan=completionPlan();
+  plan.explicit_callback={mode:'commlink_tool',tool_name:'job_report_status'};
+  f.control.completionRegister(dot,{request_message_id:e.message_id,plan});
+  await assert.rejects(f.prepare(s),x=>x.data.reason==='COMMLINK_WATCH_NOT_READY');
+  f.seedJobWatch();const p=await f.prepare(s);assert.equal(p.launch.completion.job_id,s.job_id);
+  assert.equal(f.control.callbackJob(s.job_id).executor_id,null);
+  const receipt=f.reports.report(dot,{job_id:s.job_id,status:'finished'});assert.equal(receipt.delivery,'pending_binding_or_subscription');
+  const next=f.transition(p.status,p.fence,'submitted',{executor_id:'callback-task',evidence:{source:'create_thread',state:'created'}});
+  f.reports.refreshRequest(e.message_id);let delivered;
+  await f.reports.run(async(sub,event,body)=>{delivered=JSON.parse(body);return new Response(null,{status:200});},()=>true);
+  assert.equal(delivered.data.executor_id,'callback-task');assert.equal(delivered.data.turn_id,'synthetic-turn');
+  const sig={...signalFor(e,'callback-task'),source:'commlink_hint',sender_thread_id:null,event_id:receipt.event_id};
+  assert.throws(()=>f.control.completionSignal(dot,{request_message_id:e.message_id,signal:{...sig,event_id:'invented-hint'}}),x=>x.data.reason==='SIGNAL_BINDING_MISMATCH');
+  assert.equal(f.control.completionSignal(dot,{request_message_id:e.message_id,signal:sig}).completion.action,'reconcile_provider');
+  assert.equal(f.control.status(robut,{request_message_id:e.message_id}).state,'accepted');
+  const terminal=f.transition(next,p.fence,'finished',{executor_id:'callback-task',evidence:{source:'read_thread',state:'finished'},result});
+  assert.equal(terminal.state,'finished');f.restart();assert.equal(f.reports.report(dot,{job_id:s.job_id,status:'finished'}).status,'duplicate');
+  assert.equal(f.control.completionRecovery(dot,{}).contracts[0].action,'none');
+  assert.equal(f.control.outbox(dot,{}).messages.filter(m=>JSON.parse(m.payload.body).state==='finished').length,1);
+});
+
+test('upgrades completion databases without assigning authority to legacy contracts',async t=>{
+  for(const legacy of [false,true])await t.test(legacy?'existing contract retained without owner grant':'empty legacy table accepts fresh bound contracts',async t=>{
+    const dir=await mkdtemp(join(tmpdir(),'completion-upgrade-'));t.after(()=>rm(dir,{recursive:true,force:true}));const database=join(dir,'state.sqlite');
+    const db=new DatabaseSync(database),key=randomUUID(),plan=completionPlan();
+    // Schema shipped by the previous source commit, before owner_key existed.
+    db.exec(`CREATE TABLE session_completion(request_message_id TEXT PRIMARY KEY,correlation_id TEXT NOT NULL,owner_thread_id TEXT NOT NULL,plan_json TEXT NOT NULL,
+      executor_id TEXT UNIQUE,turn_id TEXT,checks_used INTEGER NOT NULL DEFAULT 0,next_due INTEGER NOT NULL,terminal_state TEXT,terminal_source TEXT,resolved INTEGER,
+      observed_signal_count INTEGER NOT NULL DEFAULT 0,last_observed INTEGER,observed_state TEXT);`);
+    if(legacy)db.prepare('INSERT INTO session_completion(request_message_id,correlation_id,owner_thread_id,plan_json,next_due) VALUES(?,?,?,?,?)').run(key,randomUUID(),'synthetic-owning-root',JSON.stringify(plan),BASE+60000);
+    db.close();const f=await fixture(t,{database,autoCompletion:false});
+    const e=await f.put({},legacy?{message_id:key}:{}),s=await f.receive(e);
+    if(legacy){
+      assert.equal(f.control.completionRecovery(dot,{}).contracts.length,1);
+      assert.throws(()=>f.control.completionRegister(dot,{request_message_id:e.message_id,plan}),x=>x.data.reason==='COMPLETION_OWNER_MIGRATION_REQUIRED');
+      await assert.rejects(f.prepare(s),x=>x.data.reason==='COMPLETION_OWNER_MIGRATION_REQUIRED');
+      assert.equal(f.control.callbackJob(s.job_id),null,'unbound legacy owner cannot use the new callback API');
+    }else{
+      f.control.completionRegister(dot,{request_message_id:e.message_id,plan});assert.ok((await f.prepare(s)).launch);
+    }
+    f.restart();assert.equal(f.control.completionRecovery(dot,{}).contracts.length,1,'migration remains idempotent after restart');
+  });
 });
 test('isolated workerd coordinator persists launch/status/outbox across an actual runtime restart',async t=>{
   const dir=await mkdtemp(join(tmpdir(),'commlink-session-runtime-'));const config=approvedFixture();

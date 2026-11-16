@@ -1,10 +1,10 @@
 import {RpcError,exact,object,string,integer,canonical} from './protocol';
 
 type Row=Record<string,SqlStorageValue>;
-type Job={request_message_id:string;correlation_id:string};
+type Job={request_message_id:string;correlation_id:string;owner_key:string};
 const refused=(reason:string):never=>{throw new RpcError(-32010,'Completion contract refused',{reason});};
 const token=(value:unknown)=>{const s=string(value,160);if(!/^[A-Za-z0-9_.:-]+$/.test(s))throw new RpcError(-32602,'Invalid completion identifier');return s;};
-export type CompletionPlan={owner_thread_id:string;explicit_callback:{mode:'thread_message'|'unavailable';tool_name:string|null};
+export type CompletionPlan={owner_thread_id:string;explicit_callback:{mode:'thread_message'|'commlink_tool'|'unavailable';tool_name:string|null};
   platform_push:'declared'|'unavailable';recovery:{automation_id:string;owner_thread_id:string;kind:'one_shot'|'recurring';due_at:number;expires_at:number;max_checks:number;cadence_seconds:number|null}};
 
 /** Coordinator attestations of observed host metadata, not a scheduler, callback
@@ -12,11 +12,14 @@ export type CompletionPlan={owner_thread_id:string;explicit_callback:{mode:'thre
 export class CompletionRecovery {
   constructor(private sql:SqlStorage,private now=()=>Date.now()){
     sql.exec(`CREATE TABLE IF NOT EXISTS session_completion(
-      request_message_id TEXT PRIMARY KEY,correlation_id TEXT NOT NULL,owner_thread_id TEXT NOT NULL,plan_json TEXT NOT NULL,
+      request_message_id TEXT PRIMARY KEY,correlation_id TEXT NOT NULL,owner_thread_id TEXT NOT NULL,owner_key TEXT NOT NULL,plan_json TEXT NOT NULL,
       executor_id TEXT UNIQUE,turn_id TEXT,checks_used INTEGER NOT NULL DEFAULT 0,next_due INTEGER NOT NULL,
       terminal_state TEXT,terminal_source TEXT,resolved INTEGER,observed_signal_count INTEGER NOT NULL DEFAULT 0,last_observed INTEGER,observed_state TEXT);
       CREATE TABLE IF NOT EXISTS session_completion_signals(
       event_id TEXT PRIMARY KEY,request_message_id TEXT NOT NULL,source TEXT NOT NULL,event_json TEXT NOT NULL,received INTEGER NOT NULL);`);
+    // Older durable databases predate the authenticated owner column. Keep
+    // those contracts readable, but never infer authority from a thread label.
+    if(!sql.exec('PRAGMA table_info(session_completion)').toArray().some(c=>c.name==='owner_key'))sql.exec('ALTER TABLE session_completion ADD COLUMN owner_key TEXT');
   }
   private row(q:string,...args:SqlStorageValue[]){return this.sql.exec(q,...args).toArray()[0] as Row|undefined;}
   private rowFor(key:string){const row=this.row('SELECT * FROM session_completion WHERE request_message_id=?',key);if(!row)return refused('COMPLETION_CONTRACT_REQUIRED');return row;}
@@ -25,8 +28,9 @@ export class CompletionRecovery {
     const p=object(value);exact(p,['owner_thread_id','explicit_callback','platform_push','recovery']);
     if(!expectedOwner||token(p.owner_thread_id)!==expectedOwner)return refused('OWNER_NOT_VERIFIED');
     const e=object(p.explicit_callback);exact(e,['mode','tool_name']);
-    if(e.mode!=='thread_message'&&e.mode!=='unavailable')throw new RpcError(-32602,'Invalid callback mode');
-    if(e.mode==='thread_message')token(e.tool_name);else if(e.tool_name!==null)throw new RpcError(-32602,'Unexpected callback tool');
+    if(e.mode!=='thread_message'&&e.mode!=='commlink_tool'&&e.mode!=='unavailable')throw new RpcError(-32602,'Invalid callback mode');
+    if(e.mode==='commlink_tool'){if(e.tool_name!=='job_report_status')throw new RpcError(-32602,'Invalid CommLink callback tool');}
+    else if(e.mode==='thread_message')token(e.tool_name);else if(e.tool_name!==null)throw new RpcError(-32602,'Unexpected callback tool');
     if(p.platform_push!=='declared'&&p.platform_push!=='unavailable')throw new RpcError(-32602,'Invalid platform notification mode');
     const r=object(p.recovery);exact(r,['automation_id','owner_thread_id','kind','due_at','expires_at','max_checks','cadence_seconds']);
     token(r.automation_id);if(token(r.owner_thread_id)!==expectedOwner)return refused('RECOVERY_WRONG_OWNER');
@@ -44,19 +48,25 @@ export class CompletionRecovery {
     // Parse structure and owner first. An identical stored registration remains
     // idempotent even after the original due time; it never renews the plan.
     const old=this.row('SELECT * FROM session_completion WHERE request_message_id=?',job.request_message_id);
-    if(old){if(old.owner_thread_id!==expectedOwner||canonical(this.plan(old))!==canonical(value))return refused('COMPLETION_CONFLICT');return this.describe(old);}
+    if(old){
+      if(typeof old.owner_key!=='string'||!old.owner_key)return refused('COMPLETION_OWNER_MIGRATION_REQUIRED');
+      if(old.owner_key!==job.owner_key||old.owner_thread_id!==expectedOwner||canonical(this.plan(old))!==canonical(value))return refused('COMPLETION_CONFLICT');
+      return this.describe(old);
+    }
     const plan=this.parse(value,expectedOwner);
-    this.sql.exec('INSERT INTO session_completion(request_message_id,correlation_id,owner_thread_id,plan_json,next_due) VALUES(?,?,?,?,?)',
-      job.request_message_id,job.correlation_id,plan.owner_thread_id,JSON.stringify(plan),plan.recovery.due_at);
+    this.sql.exec('INSERT INTO session_completion(request_message_id,correlation_id,owner_thread_id,owner_key,plan_json,next_due) VALUES(?,?,?,?,?,?)',
+      job.request_message_id,job.correlation_id,plan.owner_thread_id,job.owner_key,JSON.stringify(plan),plan.recovery.due_at);
     return this.describe(this.rowFor(job.request_message_id));
   }
   ready(key:string,expectedOwner:string|null|undefined){
     const row=this.rowFor(key),plan=this.plan(row);
+    if(typeof row.owner_key!=='string'||!row.owner_key)return refused('COMPLETION_OWNER_MIGRATION_REQUIRED');
     if(!expectedOwner||row.owner_thread_id!==expectedOwner)return refused('OWNER_NOT_VERIFIED');
     // The saved schedule must still be in the future when the launch intent is
     // consumed. A stale one-shot is not continuing recovery coverage.
     if(row.resolved!==null||row.executor_id!==null||Number(row.checks_used)>=plan.recovery.max_checks||Number(row.next_due)>plan.recovery.expires_at||
       Number(row.next_due)<=this.now()||plan.recovery.expires_at<=this.now())return refused('RECOVERY_NOT_READY');
+    if(plan.explicit_callback.mode==='commlink_tool'&&!this.row('SELECT id FROM job_subscriptions WHERE owner=? AND owner_thread_id=? AND expires>?',row.owner_key,row.owner_thread_id,this.now()))return refused('COMMLINK_WATCH_NOT_READY');
     return {request_message_id:key,correlation_id:row.correlation_id,owner_thread_id:row.owner_thread_id,
       explicit_callback:plan.explicit_callback,platform_push:plan.platform_push,recovery:plan.recovery,
       hint:{kind:'commlink_completion_hint',schema_version:1,request_message_id:key,correlation_id:row.correlation_id,owner_thread_id:row.owner_thread_id}};
@@ -80,6 +90,10 @@ export class CompletionRecovery {
     const plan=this.plan(r);
     if(p.source==='explicit_child'){
       if(!r.executor_id||plan.explicit_callback.mode!=='thread_message'||p.sender_thread_id!==r.executor_id||p.automation_id!==null)return refused('SIGNAL_BINDING_MISMATCH');
+    }else if(p.source==='commlink_hint'){
+      if(!r.executor_id||plan.explicit_callback.mode!=='commlink_tool'||p.sender_thread_id!==null||p.automation_id!==null)return refused('SIGNAL_BINDING_MISMATCH');
+      if(!this.row('SELECT h.event_id FROM job_hints h JOIN session_jobs j ON j.id=h.job_id WHERE j.request_message_id=? AND h.event_id=? AND h.executor_id=? AND h.owner_thread_id=?',
+        key,p.event_id as string,r.executor_id,r.owner_thread_id))return refused('SIGNAL_BINDING_MISMATCH');
     }else if(p.source==='platform_push'){
       if(!r.executor_id||plan.platform_push!=='declared'||p.sender_thread_id!==null||p.automation_id!==null)return refused('SIGNAL_BINDING_MISMATCH');
     }else if(p.source==='scheduled_recovery'){
