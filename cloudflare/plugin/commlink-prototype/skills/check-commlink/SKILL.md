@@ -44,6 +44,12 @@ then acknowledge receipt after successfully reading it. An acknowledgment means
 receipt, not completion. Preserve requested work and blockers before acknowledging
 so a later turn can resume them.
 
+For a versioned application/json session_request, use the dispatch-session skill
+in this same owning dot. Its standing policy is inactive by default. Register a
+durable decision before acknowledging when the session coordinator is available;
+otherwise preserve and report the exact blocker. Do not treat session_status,
+an acknowledgment or another lifecycle message as a new launch request.
+
 Deduplicate repeated events by message ID and recorded work. Reuse the same
 outgoing message ID when retrying an identical reply. Joshua's authorized
 CommLink acceptance exchange permits a single correlated response to its fresh

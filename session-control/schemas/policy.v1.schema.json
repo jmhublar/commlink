@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://commlink.invalid/schemas/policy.v1.schema.json",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "policy_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "state": {
+      "enum": [
+        "inactive",
+        "active"
+      ]
+    },
+    "subject": {
+      "const": "robut"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "coder",
+                "architect",
+                "reviewer",
+                "investigator",
+                "writer",
+                "utility"
+              ]
+            },
+            "maxItems": 20
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "light",
+                "standard",
+                "deep",
+                "extra"
+              ]
+            },
+            "maxItems": 20
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            },
+            "maxItems": 20
+          },
+          "environments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "maxItems": 20
+          },
+          "repositories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "maxItems": 20
+          },
+          "allow_repo_free": {
+            "type": "boolean"
+          },
+          "max_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "allow_soft": {
+            "type": "boolean"
+          },
+          "operation_profile": {
+            "enum": [
+              "code.patch_test",
+              "design.readonly",
+              "document.draft",
+              "investigate.readonly",
+              "review.readonly",
+              "transform.bounded"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "roles",
+          "tiers",
+          "issues",
+          "environments",
+          "repositories",
+          "allow_repo_free",
+          "max_minutes",
+          "allow_soft",
+          "operation_profile"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 50
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "concurrent_sessions": {
+          "const": 1
+        },
+        "launches_per_rolling_hour": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      },
+      "required": [
+        "concurrent_sessions",
+        "launches_per_rolling_hour"
+      ],
+      "additionalProperties": false
+    },
+    "on_unknown": {
+      "const": "hold"
+    },
+    "confirmation_required": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "credentials_or_access_changes",
+          "deploy",
+          "merge",
+          "purchase",
+          "network_or_security_changes",
+          "policy_or_control_changes"
+        ]
+      },
+      "minItems": 6,
+      "maxItems": 6
+    }
+  },
+  "required": [
+    "schema_version",
+    "policy_id",
+    "version",
+    "state",
+    "subject",
+    "rules",
+    "limits",
+    "on_unknown",
+    "confirmation_required"
+  ],
+  "additionalProperties": false
+}

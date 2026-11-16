@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "menu_version": "roles-tiers/1",
+  "roles": {
+    "coder": {"model": "gpt-6.1-sol", "default_tier": "standard", "operation": "code.patch_test"},
+    "architect": {"model": "gpt-6-astra", "default_tier": "deep", "operation": "design.readonly"},
+    "reviewer": {"model": "gpt-6.1-sol", "default_tier": "deep", "operation": "review.readonly"},
+    "investigator": {"model": "gpt-6.1-sol", "default_tier": "standard", "operation": "investigate.readonly"},
+    "writer": {"model": "gpt-6.1-terra", "default_tier": "standard", "operation": "document.draft"},
+    "utility": {"model": "gpt-6-luna", "default_tier": "deep", "operation": "transform.bounded"}
+  },
+  "tiers": {"light": "low", "standard": "medium", "deep": "high", "extra": "xhigh"},
+  "speeds": ["default"],
+  "evidence": {"control_schema_supported": true, "runtime_verified": false, "source": "Connected create_thread schema and desktop catalog; not cloud entitlement evidence"}
+}

@@ -1,0 +1,20 @@
+{
+  "kind": "session_request",
+  "schema_version": 1,
+  "menu_version": "roles-tiers/1",
+  "menu_sha256": "3f8b72b01a7c440d710a9696252b7b095916fa3f0433ad22b777307029d291e9",
+  "expected_policy_sha256": "a02056cb7b21bdaa8b921b0c026d47bceca7d47e18cc35201527941be56ce9e7",
+  "role": "architect",
+  "tier": "extra",
+  "job": "Synthetic fixture: describe two component boundaries; no job is authorized.",
+  "linear_issue": "HUB-300",
+  "environment": "default",
+  "workdir": null,
+  "speed": "default",
+  "time_budget": {
+    "minutes": 15,
+    "mode": "soft"
+  },
+  "context_refs": [],
+  "repository": null
+}
