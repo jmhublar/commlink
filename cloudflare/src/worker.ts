@@ -4,7 +4,8 @@ import { GrokWake, type GrokEnv } from './grok-wake';
 import { callbackPost, callbackHealth, type CallbackEnv } from './callback';
 import {SessionControl} from './session-control';
 import {JobReports} from './job-reports';
-import {inactiveSessionConfiguration,type SessionConfiguration} from './session-policy';
+import {type SessionConfiguration} from './session-policy';
+import {callbackPilotConfiguration} from './callback-pilot';
 import { EVENT, JOB_EVENT, RpcError, object, exact, string, integer, peer, canonical, sha, equal, signingKey, signature, readBody, envelope, eventDefinition, jobEventDefinition, tools, uuid, type Identity, type ObjectValue, type Peer } from './protocol';
 
 // Configuration is supplied by deployment metadata; no request can select an issuer.
@@ -84,10 +85,10 @@ export class Mailbox extends DurableObject<Env> {
     this.sessions=new SessionControl(this.sql,f=>ctx.storage.transactionSync(f),()=>this.sessionConfiguration(),env.CHANNEL_ID);
     this.jobReports=new JobReports(this.sql,f=>ctx.storage.transactionSync(f),key=>this.sessions.callbackJob(key));
   }
-  // Source-controlled and inactive. No runtime request can supply activation,
-  // coordinator identities or executor capabilities. Test subclasses use only
-  // isolated fixture configurations outside the deployed Worker bundle.
-  protected sessionConfiguration():SessionConfiguration{return inactiveSessionConfiguration;}
+  // Standing execution remains inactive. Only the source-controlled, expiring
+  // owner-approved callback pilot is enabled; requests cannot change this.
+  // Test subclasses supply isolated fixture snapshots outside this bundle.
+  protected sessionConfiguration():SessionConfiguration{return callbackPilotConfiguration;}
   private rows(query:string,...params:SqlStorageValue[]):SqlRow[]{return this.sql.exec(query,...params).toArray();}
   private row(query:string,...params:SqlStorageValue[]):SqlRow|undefined{return this.rows(query,...params)[0];}
   private rate(id:Identity,op:string) {
