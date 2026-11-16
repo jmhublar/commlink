@@ -12,10 +12,18 @@ the session_* tools are installed. Their current live absence is a blocker for
 the durable coordinator workflow, not permission to emulate admission or send
 an invented lifecycle receipt. A separately authorized direct status report
 must retain its own provenance and must not pretend to be that workflow.
+Read the [completion contract](../../references/completion-contract.md) for the
+new source-only tools. Record whether an explicit child message, platform push,
+scheduled recovery or manual prompt actually resumed this root. Verify trusted
+host sender and destination metadata, then register an actual hint with
+session_completion_signal. Never trust the hint's claimed identity as proof.
 
 ## Recover the existing job
 
 Read session_recovery and session_outbox, even if recovery has no active jobs.
+Also read session_completion_recovery when its released tools are available;
+use its persisted root/task/turn/correlation and bounded recovery state. For an
+unknown creation, reconcile the original fenced intent; never invent a task ID.
 A terminal job releases its active slot while its report can still be pending.
 No active job is not proof that reporting is complete.
 
@@ -24,6 +32,10 @@ or wait_threads and verify the exact ID and relevant turn. An idle thread,
 create_thread receipt, child completion notice or requested model is insufficient
 terminal evidence. If there are follow-up turns, reconcile which turn belongs to
 the job before reporting its outcome. Do not start or retry a job from this skill.
+Use the immutable bound turn_id in provider transition evidence. A child message
+or a scheduled signal is a hint, not terminal evidence. Persist nonterminal,
+attention or unknown lookups with session_completion_observe. An exhausted or
+expired recovery plan requires attention while the reservation remains held.
 
 For a nonterminal registered job with a provider terminal result, use
 session_transition with the current
@@ -81,3 +93,6 @@ result and drain the authorized outbox without a manual prompt/poll being its
 trigger. Record scheduler/provider event, actual dot resumption, terminal evidence,
 mailbox acceptance, Robut ack and absence of a reply loop separately. A supervisor's
 wait or this skill's installation alone proves none of those wake gates.
+After terminal reconciliation, late/duplicate hints must not create another
+report. Stop only the matching job-specific recovery task within its authorized
+stop rule, verify it stopped, and preserve the native inbox watch.

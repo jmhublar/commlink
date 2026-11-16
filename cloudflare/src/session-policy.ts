@@ -20,7 +20,7 @@ export type ExecutorProfile = {environment_config_id:string;runnable:boolean;per
 // no request, MCP tool, environment-variable switch or database activation API.
 export type SessionConfiguration = {policy:StandingPolicy;activation:null|{policy_sha256:string;
   control_sha256:string;owner_receipt_verified:boolean;receipt_id:string;epoch:number;expires_at:number};
-  paused:boolean;coordinator_keys:string[];profiles:Record<string,ExecutorProfile>};
+  paused:boolean;coordinator_keys:string[];profiles:Record<string,ExecutorProfile>;completion_owner_thread_id?:string|null};
 export const inactiveSessionConfiguration:SessionConfiguration = {
   policy:inactivePolicy as StandingPolicy,activation:null,paused:true,coordinator_keys:[],profiles:{}
 };
@@ -52,7 +52,7 @@ export async function sessionDigest(domain:string,value:unknown):Promise<string>
   const bytes=new TextEncoder().encode(domain+'\n'+sessionCanonical(value));
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
 }
-export function controlDigest(c:SessionConfiguration){return sessionDigest('commlink.control.v1',{menu,coordinator_keys:c.coordinator_keys,profiles:c.profiles});}
+export function controlDigest(c:SessionConfiguration){return sessionDigest('commlink.control.v1',{menu,coordinator_keys:c.coordinator_keys,profiles:c.profiles,completion_owner_thread_id:c.completion_owner_thread_id??null});}
 export function activationValid(c:SessionConfiguration,policyHash:string,controlHash:string,now:number){const a=c.activation;
   return !!a&&a.owner_receipt_verified===true&&a.policy_sha256===policyHash&&a.control_sha256===controlHash&&
     typeof a.receipt_id==='string'&&!!a.receipt_id&&Number.isSafeInteger(a.epoch)&&a.epoch>=1&&a.expires_at>now;}

@@ -22,10 +22,12 @@ function approvedFixture(){
   return {policy:{schema_version:1,policy_id:'synthetic-only',version:1,state:'active',subject:'robut',
     rules:Object.entries(menu.roles).map(([role,r])=>({id:role,roles:[role],tiers:Object.keys(menu.tiers),issues:['HUB-300'],environments:['test'],repositories:[],allow_repo_free:true,max_minutes:30,allow_soft:true,operation_profile:r.operation})),
     limits:{concurrent_sessions:1,launches_per_rolling_hour:2},on_unknown:'hold',confirmation_required:[...inactiveSessionConfiguration.policy.confirmation_required]},
-    activation:null,paused:false,coordinator_keys:[dot.key],profiles:{test:{environment_config_id:'synthetic-environment',runnable:true,permissions_verified:true,completion_wake_verified:true,hard_timeout_verified:false,
+    activation:null,paused:false,coordinator_keys:[dot.key],completion_owner_thread_id:'synthetic-owning-root',profiles:{test:{environment_config_id:'synthetic-environment',runnable:true,permissions_verified:true,completion_wake_verified:true,hard_timeout_verified:false,
       model_efforts:Object.values(menu.roles).flatMap(r=>Object.values(menu.tiers).map(e=>r.model+':'+e)),repository_revisions:[],allow_repo_free:true,operation_profiles:Object.values(menu.roles).map(r=>r.operation),artifact_prefixes:['https://github.com/example/approved/']}}};
 }
-async function fixture(t,{config=approvedFixture(),database}={}){
+const completionPlan=(now=BASE)=>({owner_thread_id:'synthetic-owning-root',explicit_callback:{mode:'thread_message',tool_name:'send_message_to_thread'},platform_push:'declared',
+  recovery:{automation_id:'synthetic-root-schedule',owner_thread_id:'synthetic-owning-root',kind:'one_shot',due_at:now+60000,expires_at:now+300000,max_checks:1,cadence_seconds:null}});
+async function fixture(t,{config=approvedFixture(),database,autoCompletion=true}={}){
   if(!database){const dir=await mkdtemp(join(tmpdir(),'commlink-session-unit-'));database=join(dir,'state.sqlite');t.after(()=>rm(dir,{recursive:true,force:true}));}
   let now=BASE;const messages=new Map();let db,control;
   const start=()=>{db=new DatabaseSync(database);const sql={exec(q,...params){let rows=[];if(!params.length&&q.includes(';'))db.exec(q);else rows=db.prepare(q).all(...params);return {toArray:()=>rows};}};
@@ -37,16 +39,21 @@ async function fixture(t,{config=approvedFixture(),database}={}){
     role:'architect',tier:'extra',job:'Synthetic approved design only',linear_issue:'HUB-300',environment:'test',workdir:null,speed:'default',time_budget:{minutes:15,mode:'soft'},context_refs:[],...patch};};
   const put=async(patch={},options={})=>{const request=await req(patch);const e={protocol_version:'1.0',message_id:randomUUID(),correlation_id:randomUUID(),from:'robut',to:'openai',type:'MSG',seq:1,timestamp:new Date(now).toISOString(),ttl:300,
     payload:{content_type:'application/json',issue_id:'HUB-300',body:JSON.stringify(request)},...options};messages.set(e.message_id,{envelope:e,expires:now+300000});return e;};
-  const receive=e=>control.receive(dot,{request_message_id:e.message_id},id=>messages.get(id)??null);
+  const receive=async e=>{const s=await control.receive(dot,{request_message_id:e.message_id},id=>messages.get(id)??null);
+    if(autoCompletion&&s.state==='accepted')control.completionRegister(dot,{request_message_id:e.message_id,plan:completionPlan(now)});return s;};
   const prepare=s=>control.prepare(dot,{request_message_id:s.request_message_id,expected_version:s.status_seq});
-  const transition=(s,fence,event,extra={})=>control.transition(dot,{request_message_id:s.request_message_id,expected_version:s.status_seq,fence,event,...extra});
+  const transition=(s,fence,event,extra={})=>{if(['running','finished','failed'].includes(event)&&extra.executor_id)extra={...extra,evidence:{turn_id:'synthetic-turn',...extra.evidence}};
+    const next=control.transition(dot,{request_message_id:s.request_message_id,expected_version:s.status_seq,fence,event,...extra});
+    if(event==='submitted')control.completionBind(dot,{request_message_id:s.request_message_id,executor_id:extra.executor_id,turn_id:'synthetic-turn'});return next;};
   return {get control(){return control;},config,approve,req,put,receive,prepare,transition,messages,advance:ms=>{now+=ms;},
     restart:()=>{db.close();start();},get rows(){return db.prepare('SELECT * FROM session_jobs').all();}};
 }
 const result={summary:'Synthetic design completed',checks:['Compared boundaries'],limitations:[],artifacts:[]};
-async function finish(f,s){const p=await f.prepare(s);assert.ok(p.launch);let next=f.transition(p.status,p.fence,'submitted',{executor_id:'synthetic-thread',evidence:{source:'create_thread',state:'created'}});
-  next=f.transition(next,p.fence,'running',{executor_id:'synthetic-thread',evidence:{source:'read_thread',state:'running'}});
-  return f.transition(next,p.fence,'finished',{executor_id:'synthetic-thread',evidence:{source:'wait_threads',state:'finished'},result});}
+const signalFor=(e,executor,source='explicit_child')=>({event_id:randomUUID(),source,owner_thread_id:'synthetic-owning-root',executor_id:executor,correlation_id:e.correlation_id,
+  sender_thread_id:source==='explicit_child'?executor:null,automation_id:source==='scheduled_recovery'?'synthetic-root-schedule':null});
+async function finish(f,s){const p=await f.prepare(s);assert.ok(p.launch);const executor='synthetic-thread-'+s.request_message_id;let next=f.transition(p.status,p.fence,'submitted',{executor_id:executor,evidence:{source:'create_thread',state:'created'}});
+  next=f.transition(next,p.fence,'running',{executor_id:executor,evidence:{source:'read_thread',state:'running'}});
+  return f.transition(next,p.fence,'finished',{executor_id:executor,evidence:{source:'wait_threads',state:'finished'},result});}
 
 test('roles/tiers and domain-separated canonical digests have stable mappings',async()=>{
   assert.equal(menu.roles.architect.model,'gpt-6-astra');assert.equal(menu.roles.coder.model,'gpt-6.1-sol');assert.equal(menu.tiers.extra,'xhigh');
@@ -199,7 +206,89 @@ test('real deployed Worker surface stays default-deny and cannot accept an activ
   const caps=(await call(robut,'session_capabilities')).structuredContent;assert.equal(caps.active_policy.state,'inactive');
   assert.equal((await call(dot,'session_receive',{request_message_id:randomUUID()})).isError,true);
   assert.equal((await call(dot,'session_capabilities',{activation:{approved:true}})).isError,true);
+  for(const name of ['session_completion_register','session_completion_bind','session_completion_signal','session_completion_observe','session_completion_recovery'])assert.equal((await call(dot,name,{})).isError,true);
   const tools=(await stub.rpc(dot,'tools/list',{})).result.tools;assert.ok(tools.some(x=>x.name==='session_validate'));assert.ok(!tools.some(x=>/activate|revoke|cancel/.test(x.name)));
+});
+
+test('launch requires a verified owner and a future bounded root schedule; registration cannot renew it',async t=>{
+  const f=await fixture(t,{autoCompletion:false});const e=await f.put(),s=await f.receive(e),args={request_message_id:e.message_id,plan:completionPlan()};
+  await assert.rejects(f.prepare(s),x=>x.data.reason==='COMPLETION_CONTRACT_REQUIRED');
+  assert.throws(()=>f.control.completionRegister(other,args),/Forbidden/);assert.throws(()=>f.control.completionRegister(robut,args),/Forbidden/);
+  for(const plan of [{...completionPlan(),owner_thread_id:'worker-thread'}, {...completionPlan(),recovery:{...completionPlan().recovery,owner_thread_id:'worker-thread'}},
+    {...completionPlan(),recovery:{...completionPlan().recovery,max_checks:2}}, {...completionPlan(),recovery:{...completionPlan().recovery,kind:'recurring',cadence_seconds:60}}])assert.throws(()=>f.control.completionRegister(dot,{...args,plan}));
+  const saved=f.control.completionRegister(dot,args);f.restart();assert.deepEqual(f.control.completionRegister(dot,{...args,plan:{...args.plan,recovery:{...args.plan.recovery}}}),saved);
+  assert.throws(()=>f.control.completionRegister(dot,{...args,plan:{...args.plan,platform_push:'unavailable'}}),x=>x.data.reason==='COMPLETION_CONFLICT');
+  f.advance(60000);assert.equal(f.control.completionRegister(dot,args).recovery.next_due,BASE+60000);
+  await assert.rejects(f.prepare(s),x=>x.data.reason==='RECOVERY_NOT_READY');
+  f.control.completionSignal(dot,{request_message_id:e.message_id,signal:signalFor(e,null,'scheduled_recovery')});
+  await assert.rejects(f.prepare(s),x=>x.data.reason==='RECOVERY_NOT_READY','a one-shot consumed before launch is no longer recovery coverage');
+  assert.equal(f.control.recovery(dot,{}).jobs[0].phase,'accepted');
+});
+
+test('explicit and platform hints dedupe across restart and never constitute terminal evidence',async t=>{
+  const f=await fixture(t);const e=await f.put(),p=await f.prepare(await f.receive(e));
+  assert.equal(p.launch.completion.owner_thread_id,'synthetic-owning-root');assert.equal(p.launch.completion.hint.correlation_id,e.correlation_id);
+  const early=signalFor(e,'child-one');assert.throws(()=>f.control.completionSignal(dot,{request_message_id:e.message_id,signal:early}),x=>x.data.reason==='SIGNAL_BINDING_MISMATCH');
+  let s=f.transition(p.status,p.fence,'submitted',{executor_id:'child-one',evidence:{source:'create_thread',state:'created'}});
+  const count=f.control.outbox(dot,{}).messages.length;
+  for(const patch of [{owner_thread_id:'other-root'},{correlation_id:randomUUID()},{sender_thread_id:'other-child'},{executor_id:'other-child'}])assert.throws(()=>f.control.completionSignal(dot,{request_message_id:e.message_id,signal:{...early,...patch}}));
+  assert.equal(f.control.completionSignal(dot,{request_message_id:e.message_id,signal:early}).duplicate,false);
+  f.restart();assert.equal(f.control.completionSignal(dot,{request_message_id:e.message_id,signal:early}).duplicate,true);
+  assert.equal(f.control.completionRecovery(dot,{}).contracts[0].action,'reconcile_provider');
+  assert.equal(f.control.status(robut,{request_message_id:e.message_id}).state,'accepted');assert.equal(f.control.outbox(dot,{}).messages.length,count);
+  const platform=signalFor(e,'child-one','platform_push');f.control.completionSignal(dot,{request_message_id:e.message_id,signal:platform});
+  assert.throws(()=>f.control.completionSignal(dot,{request_message_id:e.message_id,signal:{...platform,event_id:early.event_id}}),x=>x.data.reason==='SIGNAL_CONFLICT');
+  assert.throws(()=>f.transition(s,p.fence,'finished',{executor_id:'child-one',evidence:{source:'explicit_child',state:'finished'},result}),x=>x.data.reason==='EVIDENCE_REQUIRED');
+  assert.throws(()=>f.transition(s,p.fence,'finished',{executor_id:'child-one',evidence:{source:'read_thread',state:'finished',turn_id:'wrong-turn'},result}),x=>x.data.reason==='TERMINAL_BINDING_MISMATCH');
+  s=f.transition(s,p.fence,'finished',{executor_id:'child-one',evidence:{source:'read_thread',state:'finished'},result});
+  const terminal=f.control.outbox(dot,{}).messages.filter(m=>JSON.parse(m.payload.body).state==='finished');assert.equal(terminal.length,1);
+  f.control.completionSignal(dot,{request_message_id:e.message_id,signal:signalFor(e,'child-one','platform_push')});f.restart();
+  const recovered=f.control.completionRecovery(dot,{}).contracts[0];assert.equal(recovered.action,'none');assert.equal(recovered.executor_id,'child-one');assert.equal(recovered.turn_id,'synthetic-turn');
+  assert.equal(recovered.terminal.source,'read_thread');assert.deepEqual(f.control.outbox(dot,{}).messages.filter(m=>JSON.parse(m.payload.body).state==='finished'),terminal);
+});
+
+test('missing callback uses root-bound bounded recovery; exhausted or failed lookups never relaunch',async t=>{
+  const f=await fixture(t,{autoCompletion:false}),e=await f.put(),s=await f.receive(e);const plan=completionPlan();plan.explicit_callback={mode:'unavailable',tool_name:null};
+  f.control.completionRegister(dot,{request_message_id:e.message_id,plan});const p=await f.prepare(s);
+  const next=f.transition(p.status,p.fence,'submitted',{executor_id:'quiet-child',evidence:{source:'create_thread',state:'created'}});
+  assert.throws(()=>f.control.completionSignal(dot,{request_message_id:e.message_id,signal:signalFor(e,'quiet-child')}));
+  const sig=signalFor(e,'quiet-child','scheduled_recovery');
+  assert.throws(()=>f.control.completionSignal(dot,{request_message_id:e.message_id,signal:sig}),x=>x.data.reason==='RECOVERY_NOT_DUE');
+  f.advance(60000);assert.throws(()=>f.control.completionSignal(dot,{request_message_id:e.message_id,signal:{...sig,automation_id:'worker-schedule'}}));
+  assert.equal(f.control.completionSignal(dot,{request_message_id:e.message_id,signal:sig}).completion.action,'reconcile_provider');
+  f.restart();assert.equal(f.control.completionSignal(dot,{request_message_id:e.message_id,signal:sig}).duplicate,true);
+  assert.throws(()=>f.control.completionSignal(dot,{request_message_id:e.message_id,signal:{...sig,event_id:randomUUID()}}),x=>x.data.reason==='RECOVERY_EXHAUSTED');
+  for(const patch of [{source:['read_thread']},{state:['unknown']}])assert.throws(()=>f.control.completionObserve(dot,{request_message_id:e.message_id,observation:{executor_id:'quiet-child',turn_id:'synthetic-turn',source:'read_thread',state:'unknown',...patch}}),x=>x.code===-32602);
+  const observed=f.control.completionObserve(dot,{request_message_id:e.message_id,observation:{executor_id:'quiet-child',turn_id:'synthetic-turn',source:'read_thread',state:'unknown'}});
+  assert.equal(observed.action,'attention');assert.equal(observed.recovery.checks_used,1);
+  assert.equal(f.control.recovery(dot,{}).jobs[0].phase,'submitted');await assert.rejects(f.prepare(next),x=>x.data.reason==='STATE_CONFLICT');
+  f.advance(86400001);f.restart();assert.equal(f.control.completionRecovery(dot,{}).contracts[0].action,'attention');
+});
+
+test('root recovery covers an ambiguous creation without inventing a task ID or releasing the slot',async t=>{
+  const f=await fixture(t),e=await f.put(),p=await f.prepare(await f.receive(e));f.transition(p.status,p.fence,'uncertain');
+  f.advance(60000);const got=f.control.completionSignal(dot,{request_message_id:e.message_id,signal:signalFor(e,null,'scheduled_recovery')});
+  assert.equal(got.completion.action,'reconcile_launch');assert.equal(got.completion.executor_id,null);f.restart();
+  assert.equal(f.control.recovery(dot,{}).jobs[0].phase,'launch_uncertain');assert.equal((await f.receive(await f.put())).decision.code,'BUSY');
+});
+
+test('recurring recovery consumes finite hourly checks and provider failure produces only one terminal report',async t=>{
+  const f=await fixture(t,{autoCompletion:false}),e=await f.put(),s=await f.receive(e),plan=completionPlan();
+  plan.recovery={...plan.recovery,kind:'recurring',cadence_seconds:3600,max_checks:2,expires_at:BASE+7200000};
+  f.control.completionRegister(dot,{request_message_id:e.message_id,plan});const p=await f.prepare(s);
+  let next=f.transition(p.status,p.fence,'submitted',{executor_id:'failing-child',evidence:{source:'create_thread',state:'created'}});
+  assert.throws(()=>f.control.completionBind(dot,{request_message_id:e.message_id,executor_id:'failing-child',turn_id:'different-turn'}),x=>x.data.reason==='TURN_CONFLICT');
+  f.advance(90000);const first=f.control.completionSignal(dot,{request_message_id:e.message_id,signal:signalFor(e,'failing-child','scheduled_recovery')});
+  assert.equal(first.completion.recovery.next_due,BASE+3660000,'late processing must not shift the next saved occurrence');
+  const observation={executor_id:'failing-child',turn_id:'synthetic-turn',source:'wait_threads',state:'running'};
+  assert.equal(f.control.completionObserve(dot,{request_message_id:e.message_id,observation:{...observation,state:'unknown'}}).action,'attention');
+  f.restart();assert.equal(f.control.completionRecovery(dot,{}).contracts[0].action,'attention');
+  assert.equal(f.control.completionObserve(dot,{request_message_id:e.message_id,observation}).action,'await_signal');
+  f.advance(3570000);const sig=signalFor(e,'failing-child','scheduled_recovery');f.control.completionSignal(dot,{request_message_id:e.message_id,signal:sig});
+  next=f.transition(next,p.fence,'failed',{executor_id:'failing-child',evidence:{source:'wait_threads',state:'failed'},result:{...result,summary:'Synthetic provider failure'}});
+  assert.equal(next.state,'failed');f.restart();assert.equal(f.control.completionRecovery(dot,{}).contracts[0].terminal.state,'failed');
+  assert.equal(f.control.completionSignal(dot,{request_message_id:e.message_id,signal:sig}).duplicate,true);
+  assert.equal(f.control.outbox(dot,{}).messages.filter(m=>JSON.parse(m.payload.body).state==='failed').length,1);assert.equal(f.control.recovery(dot,{}).jobs.length,0);
 });
 test('isolated workerd coordinator persists launch/status/outbox across an actual runtime restart',async t=>{
   const dir=await mkdtemp(join(tmpdir(),'commlink-session-runtime-'));const config=approvedFixture();
@@ -219,14 +308,21 @@ test('isolated workerd coordinator persists launch/status/outbox across an actua
     payload:{content_type:'application/json',issue_id:'HUB-300',body:JSON.stringify({kind:'session_request',schema_version:1,menu_version:caps.menu_version,menu_sha256:caps.menu_sha256,expected_policy_sha256:caps.active_policy.sha256,role:'coder',job:'Synthetic patch/test job; no actual execution',linear_issue:'HUB-300',environment:'test',workdir:null,speed:'default',time_budget:{minutes:10,mode:'soft'},context_refs:[]})}};
   await tool(robut,'send',{to:'openai',msg:e});let s=await tool(dot,'session_receive',{request_message_id:e.message_id});assert.equal(s.state,'accepted');assert.equal(s.selection.tier,'standard');
   assert.equal((await raw(other,'session_receive',{request_message_id:e.message_id})).isError,true);
+  await tool(dot,'session_completion_register',{request_message_id:e.message_id,plan:completionPlan()});
   const p=await tool(dot,'session_prepare_launch',{request_message_id:e.message_id,expected_version:s.status_seq});assert.ok(p.launch);assert.equal(p.launch.thinking,'medium');
   s=await tool(dot,'session_transition',{request_message_id:e.message_id,expected_version:p.status.status_seq,fence:p.fence,event:'submitted',executor_id:'synthetic-cloud-thread',evidence:{source:'create_thread',state:'created'}});
-  s=await tool(dot,'session_transition',{request_message_id:e.message_id,expected_version:s.status_seq,fence:p.fence,event:'running',executor_id:'synthetic-cloud-thread',evidence:{source:'read_thread',state:'running'}});
+  await tool(dot,'session_completion_bind',{request_message_id:e.message_id,executor_id:'synthetic-cloud-thread',turn_id:'synthetic-turn'});
+  s=await tool(dot,'session_transition',{request_message_id:e.message_id,expected_version:s.status_seq,fence:p.fence,event:'running',executor_id:'synthetic-cloud-thread',evidence:{source:'read_thread',state:'running',turn_id:'synthetic-turn'}});
+  const childHint=signalFor(e,'synthetic-cloud-thread');
+  await tool(dot,'session_completion_signal',{request_message_id:e.message_id,signal:childHint});
   const pending=await tool(dot,'session_outbox');for(const msg of pending.messages){await tool(dot,'send',{to:'robut',msg});await tool(dot,'session_outbox_mark_sent',{message_id:msg.message_id});}
   assert.equal((await tool(dot,'session_outbox')).messages.length,0);
   await mf.dispose();await start();const recovered=(await tool(dot,'session_recovery')).jobs[0];assert.equal(recovered.phase,'started');assert.equal(recovered.status.executor.id,'synthetic-cloud-thread');assert.equal(recovered.fence,p.fence);
+  const completion=(await tool(dot,'session_completion_recovery')).contracts[0];assert.equal(completion.owner_thread_id,'synthetic-owning-root');assert.equal(completion.turn_id,'synthetic-turn');assert.equal(completion.action,'reconcile_provider');
+  assert.equal((await tool(dot,'session_completion_signal',{request_message_id:e.message_id,signal:childHint})).duplicate,true);
+  await tool(dot,'session_completion_observe',{request_message_id:e.message_id,observation:{executor_id:'synthetic-cloud-thread',turn_id:'synthetic-turn',source:'read_thread',state:'running'}});
   assert.equal((await tool(robut,'session_status',{request_message_id:e.message_id})).state,'started');
-  s=await tool(dot,'session_transition',{request_message_id:e.message_id,expected_version:s.status_seq,fence:p.fence,event:'finished',executor_id:'synthetic-cloud-thread',evidence:{source:'wait_threads',state:'finished'},result});
+  s=await tool(dot,'session_transition',{request_message_id:e.message_id,expected_version:s.status_seq,fence:p.fence,event:'finished',executor_id:'synthetic-cloud-thread',evidence:{source:'wait_threads',state:'finished',turn_id:'synthetic-turn'},result});
   assert.equal(s.state,'finished');assert.equal((await tool(dot,'session_recovery')).jobs.length,0);assert.equal((await tool(dot,'session_outbox')).messages.length,1);
   assert.equal((await tool(robut,'poll',{since:0})).messages.length,pending.messages.length,'outbox acceptance did not manufacture recipient acknowledgment');
   // Simulate the owning dot returning after terminal state was committed but

@@ -7,6 +7,7 @@ Use this for completion follow-up in the singular existing owning dot. The
 schedule is the wake source; this skill is its workflow. Read
 [host capabilities](../../references/host-capabilities.md) before choosing tools.
 Mailbox events and completion rechecks are separate subscriptions/tasks.
+Follow the [completion contract](../../references/completion-contract.md).
 
 ## Bind the owner and scope first
 
@@ -41,10 +42,20 @@ Use the [durable prompt template](../../references/completion-watch-prompt.md).
 Resolve every job/owner/scope field from actual records. Keep the prompt
 self-contained if the new skill or coordinator tools are not yet installed.
 Saved schedule success does not prove a run, provider completion or Grok receipt.
+For a registered job, persist the actual saved root-bound automation ID, due time,
+expiry, finite check count and cadence using session_completion_register before
+launch. A recurring native schedule must have its own matching COUNT/UNTIL/stop
+rule; the source counter does not stop an upstream scheduler. The source supports
+one-shot/one check or hourly-or-slower recurrence, at most 24 checks within a day.
+The contract cannot renew itself or use a due-before-launch recovery as coverage.
 
 ## Handle each native return
 
 Verify this is the owning dot and record which scheduler event resumed it.
+Check the actual saved automation/run identity before recording scheduled_recovery
+through session_completion_signal. A missing callback and an ambiguous creation
+use the same bounded root recovery; never launch again to discover what happened.
+Deduplicate an already recorded event rather than consuming another check.
 For an authorized read-only probe check, retrieve only that known provider turn
 and report the result in this chat. Do not fabricate a Robut request mapping.
 For a registered job, follow report-session-completion: recover exact provider

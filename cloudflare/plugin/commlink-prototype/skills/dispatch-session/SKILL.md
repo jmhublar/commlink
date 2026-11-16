@@ -6,9 +6,10 @@ description: Process versioned CommLink role/tier session requests in Joshua's e
 Only Joshua's existing owning dot coordinates this workflow. Keep the native
 CommLink subscription in that conversation. Do not create another dot, watcher,
 subscription owner or scheduler as a fallback. Grok handles its pstack mapping.
-Read [host capabilities](../../references/host-capabilities.md) when checking
-tool availability. The connected live host currently lacks the session_* tools;
-their implementation in source is not deployment evidence. If absent, preserve
+Read [host capabilities](../../references/host-capabilities.md) and the
+[completion contract](../../references/completion-contract.md) when checking
+tool availability. The nine original session_* tools were released; the new
+completion tools are source-only until separately deployed. If absent, preserve
 the request and blocker instead of inventing a call or launching directly.
 
 ## Gates
@@ -57,6 +58,15 @@ to establish an explicitly authorized recheck with the correct owner and limits.
 
 ## One-shot launch and evidence
 
+Before preparing launch, verify the exact existing owning thread against the
+trusted operator snapshot. Create/reuse only an authorized bounded recovery
+return from that root, inspect its saved destination and stop rule, and persist
+it with session_completion_register. Record explicit child callback support
+separately from declared platform push. A worker-bound schedule or task creation
+receipt is not callback delivery evidence. Launch now refuses a missing, wrong-root
+or stale completion contract. Root-bound recovery is required even when the host
+promises terminal notifications.
+
 For accepted work only, call session_prepare_launch once with the current status
 version. It rechecks policy/menu/profile/expiry, consumes the hourly launch
 budget and writes a fenced intent before returning launch data. If launch is
@@ -74,6 +84,14 @@ Use only the returned runnable codexCloud target/model/thinking and the approved
 job. Supply enough approved source context and limits in the task brief. Never
 pass arbitrary caller flags or invent a speed/cwd parameter. Preserve direct
 Joshua approval required by the task tool for its precise model selection.
+Include launch.completion's fixed root/correlation/hint bindings. Where genuinely
+authorized and supported, permit only one minimal child-to-root callback using
+the child's actual parent-message tool. A general no-tools instruction must
+explicitly exempt that bounded callback; do not silently forbid the callback
+being tested. Pass actual owner authorization evidence through supported trusted
+host context. A parent's assertion alone cannot satisfy a messaging tool's
+requirement for direct human permission. With no supported authorized child tool,
+record unavailable and rely on the required bounded root recovery.
 
 Record submitted with the actual returned threadId using session_transition,
 current version and fence. A clientThreadId alone is setup-pending, not a thread
@@ -81,6 +99,8 @@ ID or running evidence. If setup/creation may exist but a usable ID is missing,
 record uncertain; do not retry or substitute another environment. Only a
 definitive provider rejection proving no task was created may record failed with
 create_thread/not_created evidence. Timeouts and generic errors are uncertain.
+Read the actual task and bind its relevant launched turn with
+session_completion_bind. Do not bind a later follow-up turn or infer an ID.
 
 Use read_thread/wait_threads on the exact recorded ID. Record running only after
 actual provider running evidence; created is not started. Record finished/failed
@@ -91,6 +111,12 @@ credential paths, signed URLs or hidden reasoning in results. A soft budget
 expiry is an attention condition, not proof of cancellation; retain the slot
 while the provider might still be running. No cancellation/reset/relaunch tool
 is provided by this package.
+Include the bound turn_id in running and terminal provider evidence. Record
+explicit child, platform or scheduled hints through session_completion_signal
+only after checking actual host sender/recipient/event metadata; callback JSON
+cannot authenticate its own claimed sender. Reconcile exact provider state; hints
+alone never mark completion. For nonterminal/unknown observations use
+session_completion_observe, preserving the active reservation and recovery limit.
 
 ## Durable reporting
 

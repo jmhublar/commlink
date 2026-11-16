@@ -5,16 +5,17 @@ The repository's `.agents/skills/` entries are relative symlinks to that source,
 so repo discovery and the portable plugin use the same instructions. They are
 not user-global installs. See the [official discovery/symlink rules](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills).
 
-| Skill | Work owned by the existing dot | Installed helper 0.1.2 | Repo package 0.3.0 |
+| Skill | Work owned by the existing dot | Released helper 0.3.0 | Source package 0.4.0 |
 | --- | --- | --- | --- |
-| [check-commlink](../cloudflare/plugin/commlink-prototype/skills/check-commlink/SKILL.md) | Mailbox recovery, native message events, owner/lease checks | Older version | Reconciled |
-| [dispatch-session](../cloudflare/plugin/commlink-prototype/skills/dispatch-session/SKILL.md) | Validate/admit role-tier request, fenced one-shot cloud handoff | Absent | Present; policy inactive |
-| [report-session-completion](../cloudflare/plugin/commlink-prototype/skills/report-session-completion/SKILL.md) | Provider evidence, correlated terminal outbox delivery to Robut | Absent | Present; coordinator tools not live |
-| [watch-session-completion](../cloudflare/plugin/commlink-prototype/skills/watch-session-completion/SKILL.md) | Authorized same-dot scheduled recheck, ownership and stop rule | Absent | Added |
+| [check-commlink](../cloudflare/plugin/commlink-prototype/skills/check-commlink/SKILL.md) | Mailbox recovery, native message events, owner/lease checks | Present | Preserved |
+| [dispatch-session](../cloudflare/plugin/commlink-prototype/skills/dispatch-session/SKILL.md) | Validate/admit role-tier request, fenced handoff with required completion route | Present | Callback/recovery gate added; policy inactive |
+| [report-session-completion](../cloudflare/plugin/commlink-prototype/skills/report-session-completion/SKILL.md) | Bound task/turn provider evidence, correlated terminal outbox to Robut | Present | Distinct signal sources and reconciliation |
+| [watch-session-completion](../cloudflare/plugin/commlink-prototype/skills/watch-session-completion/SKILL.md) | Root-owned bounded recovery, ownership and stop rule | Present | Durable plan, finite checks and attention |
 
-The installed-source read is recorded in [skills-inventory.json](skills-inventory.json).
-The private `commlink-prototype` helper is USER-scoped, version 0.1.2, with only
-check-commlink. Its generated legacy compatibility files accompany the portable
+The original pre-release inventory is recorded in [skills-inventory.json](skills-inventory.json).
+The private USER-scoped helper was subsequently released as 0.3.0 with all four
+skills, release `pluginrel_6afa6e9d29c081918fd148831873ef4d`. The 0.4.0 changes
+are source-only. Generated legacy compatibility files accompany the portable
 manifest. The separate App-backed CommLink connection is version 1.0.0, has no
 skills and owns the existing MCP/OAuth connection. It is not a missing duplicate
 skill package. Neither live plugin is changed by this source work.
@@ -31,8 +32,10 @@ runtime skills to duplicate.
 [Packaged host guidance](../cloudflare/plugin/commlink-prototype/references/host-capabilities.md)
 is shared by all four skills. Live mailbox tools are link_status, poll, ack and
 send, with native message-created subscription helpers. The nine session_*
-operations exist in this repo's Worker source and tests but are absent from the
-connected host's live tool list. Installing instruction files cannot deploy them.
+operations were released in Worker version ef66d78d-9cc7-43cd-9101-bb621ecd8947.
+The five new completion-contract tools remain source-only. Installing instruction
+files cannot deploy server changes. See the packaged
+[completion contract](../cloudflare/plugin/commlink-prototype/references/completion-contract.md).
 The policy remains inactive/paused with no activation receipt or coordinator keys.
 
 The host subscription-update schema has no explicit lease-renewal argument.
@@ -58,7 +61,7 @@ repository-free/no-egress proposal and does not silently replace its grant.
 
 Run `just plugin-check` to validate skill YAML, canonical discovery links, packaged
 references, connection preservation and generated compatibility metadata. Run
-`just plugin-package /tmp/commlink-plugin-0.3.0.zip` to produce a review artifact;
+`just plugin-package /tmp/commlink-plugin-0.4.0.zip` to produce a review artifact;
 the builder performs no install, API request, publication or deployment.
 Python 3 and the pinned development dependency in `scripts/requirements-plugin.txt`
 are required. Do not install anything automatically from a skill workflow.

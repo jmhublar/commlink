@@ -163,6 +163,11 @@ export class Mailbox extends DurableObject<Env> {
         else if(p.name==='session_transition')result=this.sessions.transition(id,a);
         else if(p.name==='session_outbox')result=this.sessions.outbox(id,a);
         else if(p.name==='session_recovery')result=this.sessions.recovery(id,a);
+        else if(p.name==='session_completion_register')result=this.sessions.completionRegister(id,a);
+        else if(p.name==='session_completion_bind')result=this.sessions.completionBind(id,a);
+        else if(p.name==='session_completion_signal')result=this.sessions.completionSignal(id,a);
+        else if(p.name==='session_completion_observe')result=this.sessions.completionObserve(id,a);
+        else if(p.name==='session_completion_recovery')result=this.sessions.completionRecovery(id,a);
         else if(p.name==='session_outbox_mark_sent')result=this.sessions.markSent(id,a,key=>{
           const r=this.row('SELECT envelope FROM messages WHERE id=? AND sender=\'openai\' AND recipient=\'robut\'',key);
           return r?JSON.parse(String(r.envelope)):null;
