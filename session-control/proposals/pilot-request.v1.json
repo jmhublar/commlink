@@ -1,0 +1,17 @@
+{
+  "kind": "session_request",
+  "schema_version": 1,
+  "menu_version": "roles-tiers/1",
+  "menu_sha256": "3f8b72b01a7c440d710a9696252b7b095916fa3f0433ad22b777307029d291e9",
+  "expected_policy_sha256": "adfddc70f6ed8955b7bd220a5ebaa49162e5937c575ddaed432df416053580a3",
+  "role": "utility",
+  "tier": "light",
+  "job": "Convert the public literal 'commlink pilot' to uppercase and return the result in your final response. Use no repository, external services, connected accounts or credentials.",
+  "linear_issue": "HUB-300",
+  "environment": "cloud_pilot",
+  "repository": null,
+  "workdir": null,
+  "speed": "default",
+  "time_budget": {"minutes": 5, "mode": "soft"},
+  "context_refs": []
+}

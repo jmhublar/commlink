@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "policy_id": "commlink-standing-jobs",
+  "version": 1,
+  "state": "inactive",
+  "subject": "robut",
+  "rules": [],
+  "limits": {"concurrent_sessions": 1, "launches_per_rolling_hour": 2},
+  "on_unknown": "hold",
+  "confirmation_required": ["credentials_or_access_changes", "deploy", "merge", "purchase", "network_or_security_changes", "policy_or_control_changes"]
+}

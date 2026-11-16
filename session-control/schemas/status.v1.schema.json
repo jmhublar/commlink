@@ -1,0 +1,353 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://commlink.invalid/schemas/status.v1.schema.json",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "const": "session_status"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "request_message_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+    },
+    "job_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+    },
+    "status_seq": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "state": {
+      "enum": [
+        "held",
+        "rejected",
+        "accepted",
+        "started",
+        "finished",
+        "failed"
+      ]
+    },
+    "decision": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "retry_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "maxItems": 20
+        }
+      },
+      "required": [
+        "code",
+        "retryable",
+        "retry_after_seconds",
+        "fields"
+      ],
+      "additionalProperties": false
+    },
+    "selection": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "enum": [
+                "coder",
+                "architect",
+                "reviewer",
+                "investigator",
+                "writer",
+                "utility"
+              ]
+            },
+            "tier": {
+              "enum": [
+                "light",
+                "standard",
+                "deep",
+                "extra"
+              ]
+            },
+            "model": {
+              "enum": [
+                "gpt-6-astra",
+                "gpt-6-luna",
+                "gpt-6.1-sol",
+                "gpt-6.1-terra"
+              ]
+            },
+            "effort": {
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            "speed": {
+              "const": "default"
+            },
+            "effective_model": {
+              "type": "null"
+            },
+            "effective_effort": {
+              "type": "null"
+            },
+            "effective_speed": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "role",
+            "tier",
+            "model",
+            "effort",
+            "speed",
+            "effective_model",
+            "effective_effort",
+            "effective_speed"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "policy": {
+      "type": "object",
+      "properties": {
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "control_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "epoch": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "approval_receipt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rule_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "sha256",
+        "control_sha256",
+        "epoch",
+        "approval_receipt",
+        "rule_id"
+      ],
+      "additionalProperties": false
+    },
+    "executor": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "codex_cloud"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "result": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "summary": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "checks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "maxItems": 20
+            },
+            "limitations": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "maxItems": 20
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  },
+                  "url": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1500
+                  },
+                  "sha256": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "url",
+                  "sha256"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 10
+            }
+          },
+          "required": [
+            "summary",
+            "checks",
+            "limitations",
+            "artifacts"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    }
+  },
+  "required": [
+    "kind",
+    "schema_version",
+    "request_message_id",
+    "job_id",
+    "status_seq",
+    "state",
+    "decision",
+    "selection",
+    "policy",
+    "executor",
+    "result",
+    "timestamp"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "started"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "executor": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "finished",
+              "failed"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  ]
+}

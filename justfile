@@ -10,6 +10,14 @@ prototype-check:
 prototype-build:
     cd cloudflare && npm run build
 
+# Source validation and a local review ZIP only; never installs or publishes.
+plugin-check:
+    python3 scripts/package-plugin.py
+    python3 -m unittest discover -s scripts -p 'test_plugin_package.py'
+
+plugin-package destination:
+    python3 scripts/package-plugin.py --output {{quote(destination)}}
+
 callback-transport-build:
     cd cloudflare && node scripts/build-callback-gateway.mjs
 

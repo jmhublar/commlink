@@ -2,6 +2,8 @@ import { DurableObject } from 'cloudflare:workers';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { GrokWake, type GrokEnv } from './grok-wake';
 import { callbackPost, callbackHealth, type CallbackEnv } from './callback';
+import {SessionControl} from './session-control';
+import {inactiveSessionConfiguration,type SessionConfiguration} from './session-policy';
 import { EVENT, RpcError, object, exact, string, integer, peer, canonical, sha, equal, signingKey, signature, readBody, envelope, eventDefinition, tools, uuid, type Identity, type ObjectValue, type Peer } from './protocol';
 
 // Configuration is supplied by deployment metadata; no request can select an issuer.
@@ -64,6 +66,7 @@ async function webhook(env:Env,url:string,secret:string,id:string,subscription:s
 export class Mailbox extends DurableObject<Env> {
   private sql:SqlStorage;
   private grok:GrokWake;
+  private sessions:SessionControl;
   constructor(ctx:DurableObjectState,env:Env) {
     super(ctx,env);this.sql=ctx.storage.sql;
     this.sql.exec(`
@@ -76,7 +79,12 @@ export class Mailbox extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS subscription_attempts(owner TEXT PRIMARY KEY,attempt_id TEXT NOT NULL,attempted INTEGER NOT NULL,outcome TEXT NOT NULL,code INTEGER,reason TEXT,callback_origin TEXT);
     `);
     this.grok=new GrokWake(ctx,env);
+    this.sessions=new SessionControl(this.sql,f=>ctx.storage.transactionSync(f),()=>this.sessionConfiguration(),env.CHANNEL_ID);
   }
+  // Source-controlled and inactive. No runtime request can supply activation,
+  // coordinator identities or executor capabilities. Test subclasses use only
+  // isolated fixture configurations outside the deployed Worker bundle.
+  protected sessionConfiguration():SessionConfiguration{return inactiveSessionConfiguration;}
   private rows(query:string,...params:SqlStorageValue[]):SqlRow[]{return this.sql.exec(query,...params).toArray();}
   private row(query:string,...params:SqlStorageValue[]):SqlRow|undefined{return this.rows(query,...params)[0];}
   private rate(id:Identity,op:string) {
@@ -144,6 +152,21 @@ export class Mailbox extends DurableObject<Env> {
         else if(p.name==='poll')result=this.poll(id,a);
         else if(p.name==='ack')result=this.ack(id,a);
         else if(p.name==='link_status')result=await this.status(id,a);
+        else if(p.name==='session_capabilities')result=await this.sessions.capabilities(a);
+        else if(p.name==='session_validate')result=await this.sessions.validate(a);
+        else if(p.name==='session_status')result=this.sessions.status(id,a);
+        else if(p.name==='session_receive')result=await this.sessions.receive(id,a,key=>{
+          const r=this.row('SELECT envelope,expires FROM messages WHERE id=? AND sender=\'robut\' AND recipient=\'openai\'',key);
+          return r?{envelope:JSON.parse(String(r.envelope)),expires:Number(r.expires)}:null;
+        });
+        else if(p.name==='session_prepare_launch')result=await this.sessions.prepare(id,a);
+        else if(p.name==='session_transition')result=this.sessions.transition(id,a);
+        else if(p.name==='session_outbox')result=this.sessions.outbox(id,a);
+        else if(p.name==='session_recovery')result=this.sessions.recovery(id,a);
+        else if(p.name==='session_outbox_mark_sent')result=this.sessions.markSent(id,a,key=>{
+          const r=this.row('SELECT envelope FROM messages WHERE id=? AND sender=\'openai\' AND recipient=\'robut\'',key);
+          return r?JSON.parse(String(r.envelope)):null;
+        });
         else throw new RpcError(-32602,'Unknown tool');
         return {content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result};
       } catch(e) {

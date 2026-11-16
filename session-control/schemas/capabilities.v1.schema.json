@@ -1,0 +1,341 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://commlink.invalid/schemas/capabilities.v1.schema.json",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "menu_version": {
+      "const": "roles-tiers/1"
+    },
+    "menu_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "roles": {
+      "type": "object",
+      "properties": {
+        "coder": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "const": "gpt-6.1-sol"
+            },
+            "default_tier": {
+              "const": "standard"
+            },
+            "operation": {
+              "const": "code.patch_test"
+            }
+          },
+          "required": [
+            "model",
+            "default_tier",
+            "operation"
+          ],
+          "additionalProperties": false
+        },
+        "architect": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "const": "gpt-6-astra"
+            },
+            "default_tier": {
+              "const": "deep"
+            },
+            "operation": {
+              "const": "design.readonly"
+            }
+          },
+          "required": [
+            "model",
+            "default_tier",
+            "operation"
+          ],
+          "additionalProperties": false
+        },
+        "reviewer": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "const": "gpt-6.1-sol"
+            },
+            "default_tier": {
+              "const": "deep"
+            },
+            "operation": {
+              "const": "review.readonly"
+            }
+          },
+          "required": [
+            "model",
+            "default_tier",
+            "operation"
+          ],
+          "additionalProperties": false
+        },
+        "investigator": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "const": "gpt-6.1-sol"
+            },
+            "default_tier": {
+              "const": "standard"
+            },
+            "operation": {
+              "const": "investigate.readonly"
+            }
+          },
+          "required": [
+            "model",
+            "default_tier",
+            "operation"
+          ],
+          "additionalProperties": false
+        },
+        "writer": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "const": "gpt-6.1-terra"
+            },
+            "default_tier": {
+              "const": "standard"
+            },
+            "operation": {
+              "const": "document.draft"
+            }
+          },
+          "required": [
+            "model",
+            "default_tier",
+            "operation"
+          ],
+          "additionalProperties": false
+        },
+        "utility": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "const": "gpt-6-luna"
+            },
+            "default_tier": {
+              "const": "deep"
+            },
+            "operation": {
+              "const": "transform.bounded"
+            }
+          },
+          "required": [
+            "model",
+            "default_tier",
+            "operation"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "coder",
+        "architect",
+        "reviewer",
+        "investigator",
+        "writer",
+        "utility"
+      ],
+      "additionalProperties": false
+    },
+    "tiers": {
+      "type": "object",
+      "properties": {
+        "light": {
+          "const": "low"
+        },
+        "standard": {
+          "const": "medium"
+        },
+        "deep": {
+          "const": "high"
+        },
+        "extra": {
+          "const": "xhigh"
+        }
+      },
+      "required": [
+        "light",
+        "standard",
+        "deep",
+        "extra"
+      ],
+      "additionalProperties": false
+    },
+    "controls": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "const": "schema-supported"
+        },
+        "reasoning": {
+          "const": "schema-supported"
+        },
+        "speed": {
+          "const": [
+            "default"
+          ]
+        },
+        "workdir": {
+          "type": "null"
+        },
+        "hard_timeout": {
+          "const": "unverified"
+        }
+      },
+      "required": [
+        "model",
+        "reasoning",
+        "speed",
+        "workdir",
+        "hard_timeout"
+      ],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "control_schema_supported": {
+          "const": true
+        },
+        "runtime_verified": {
+          "const": false
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "control_schema_supported",
+        "runtime_verified",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "active_policy": {
+      "type": "object",
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "version": {
+          "type": "integer"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "state": {
+          "enum": [
+            "inactive",
+            "active"
+          ]
+        },
+        "owner_approval_verified": {
+          "type": "boolean"
+        },
+        "epoch": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "paused": {
+          "type": "boolean"
+        },
+        "control_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "policy_id",
+        "version",
+        "sha256",
+        "state",
+        "owner_approval_verified",
+        "epoch",
+        "paused",
+        "control_sha256"
+      ],
+      "additionalProperties": false
+    },
+    "coordinator_configured": {
+      "type": "boolean"
+    },
+    "environments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "runnable": {
+            "type": "boolean"
+          },
+          "permissions_verified": {
+            "type": "boolean"
+          },
+          "completion_wake_verified": {
+            "type": "boolean"
+          },
+          "hard_timeout_verified": {
+            "type": "boolean"
+          },
+          "model_efforts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "alias",
+          "runnable",
+          "permissions_verified",
+          "completion_wake_verified",
+          "hard_timeout_verified",
+          "model_efforts"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 20
+    }
+  },
+  "required": [
+    "schema_version",
+    "menu_version",
+    "menu_sha256",
+    "roles",
+    "tiers",
+    "controls",
+    "evidence",
+    "active_policy",
+    "coordinator_configured",
+    "environments"
+  ],
+  "additionalProperties": false
+}

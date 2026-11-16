@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-11-16T02:35:27Z",
+  "canonical_plugin": "cloudflare/plugin/commlink-prototype",
+  "source_version": "0.3.0",
+  "installed_plugins": [
+    {
+      "plugin_id": "plugins_6af9fc8296c48191aeb72f02476d8fec",
+      "name": "commlink-prototype",
+      "description": "Private CommLink mailbox and MCP event subscription prototype for HUB-300.",
+      "version": "0.1.2",
+      "current_release_id": "pluginrel_6afa23e9b7f881919b8014ef54c275f8",
+      "scope": "USER",
+      "discoverability": "PRIVATE",
+      "skills": [
+        "check-commlink"
+      ]
+    },
+    {
+      "plugin_id": "plugin_asdk_app_6afa22b05dc88191a45a30e16dfde7ec",
+      "name": "dev-6afa22b05dc88191a45a30e16dfde7ec",
+      "description": "Private HUB-300 agent mailbox and native message events",
+      "version": "1.0.0",
+      "current_release_id": "PluginRelease_3d48f521906c8191bd49aa5137ad61e5",
+      "scope": "USER",
+      "discoverability": "PRIVATE",
+      "skills": []
+    }
+  ],
+  "repository_skills": [
+    {
+      "name": "check-commlink",
+      "path": "cloudflare/plugin/commlink-prototype/skills/check-commlink/SKILL.md",
+      "discovery_link": ".agents/skills/check-commlink"
+    },
+    {
+      "name": "dispatch-session",
+      "path": "cloudflare/plugin/commlink-prototype/skills/dispatch-session/SKILL.md",
+      "discovery_link": ".agents/skills/dispatch-session"
+    },
+    {
+      "name": "report-session-completion",
+      "path": "cloudflare/plugin/commlink-prototype/skills/report-session-completion/SKILL.md",
+      "discovery_link": ".agents/skills/report-session-completion"
+    },
+    {
+      "name": "watch-session-completion",
+      "path": "cloudflare/plugin/commlink-prototype/skills/watch-session-completion/SKILL.md",
+      "discovery_link": ".agents/skills/watch-session-completion"
+    }
+  ],
+  "preserved_connection": {
+    "app": {
+      "apps": {
+        "dev-6afa22b05dc88191a45a30e16dfde7ec": {
+          "id": "asdk_app_6afa22b05dc88191a45a30e16dfde7ec"
+        }
+      }
+    },
+    "mcp": {
+      "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+      "mcpServers": {
+        "commlink": {
+          "type": "streamable-http",
+          "url": "https://commlink-prototype.joshua-m-hublar.workers.dev/mcp",
+          "extensions": {
+            "com.openai": {
+              "auth": {
+                "type": "oauth",
+                "client": {
+                  "mode": "dcr"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "live_mailbox_operations": [
+    "link_status",
+    "poll",
+    "ack",
+    "send"
+  ],
+  "native_event_operations": [
+    "subscribe_to_events",
+    "update_subscription"
+  ],
+  "source_only_operations": [
+    "session_capabilities",
+    "session_validate",
+    "session_status",
+    "session_receive",
+    "session_prepare_launch",
+    "session_transition",
+    "session_recovery",
+    "session_outbox",
+    "session_outbox_mark_sent"
+  ],
+  "evidence": {
+    "mailbox_nonce_exchange": "previously observed; lease continuity separate",
+    "supervised_cloud_probe": "completed; no recorded tool calls",
+    "owning_dot_scheduled_recovery": "parent verified native invocation after foreground turn ended; matching COMMLINK_PILOT_OK",
+    "worker_bound_invocation": "also fired; not owning-dot evidence",
+    "immediate_provider_push": false,
+    "live_grok_terminal_delivery": false,
+    "standing_policy_active": false
+  },
+  "adjacent_skills": [
+    {
+      "name": "agent-bus",
+      "source": "user skill and sysop agent-bus-reply plugin",
+      "disposition": "not copied; different NATS transport, at-most-once pull, SysOp-owned"
+    },
+    {
+      "name": "agent-bus-reply",
+      "source": "sysop agent-bus-reply 0.1.0+codex.20260926133843",
+      "disposition": "not copied; distinct legacy NATS exchange, not CommLink wake/runtime"
+    }
+  ]
+}

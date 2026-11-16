@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://commlink.invalid/schemas/request.v1.schema.json",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "const": "session_request"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "menu_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "menu_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "expected_policy_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "role": {
+      "enum": [
+        "coder",
+        "architect",
+        "reviewer",
+        "investigator",
+        "writer",
+        "utility"
+      ]
+    },
+    "tier": {
+      "enum": [
+        "light",
+        "standard",
+        "deep",
+        "extra"
+      ]
+    },
+    "job": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "linear_issue": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9]*-[1-9][0-9]*$",
+      "maxLength": 32
+    },
+    "environment": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "maxLength": 64
+    },
+    "workdir": {
+      "type": "null"
+    },
+    "speed": {
+      "const": "default"
+    },
+    "time_budget": {
+      "type": "object",
+      "properties": {
+        "minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "mode": {
+          "enum": [
+            "soft",
+            "hard"
+          ]
+        }
+      },
+      "required": [
+        "minutes",
+        "mode"
+      ],
+      "additionalProperties": false
+    },
+    "context_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(linear:[A-Z][A-Z0-9]*-[1-9][0-9]*|github:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[a-f0-9]{40})$",
+        "maxLength": 180
+      },
+      "maxItems": 16
+    },
+    "repository": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+              "maxLength": 160
+            },
+            "revision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            }
+          },
+          "required": [
+            "name",
+            "revision"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "kind",
+    "schema_version",
+    "menu_version",
+    "menu_sha256",
+    "expected_policy_sha256",
+    "role",
+    "job",
+    "linear_issue",
+    "environment",
+    "workdir",
+    "speed",
+    "time_budget",
+    "context_refs"
+  ],
+  "additionalProperties": false
+}

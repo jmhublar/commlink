@@ -1,4 +1,12 @@
-# HUB-300 Comlink relay — build notes (2026-10-13)
+# CommLink
+
+The current repo-owned workflows are listed in [CommLink skills](docs/skills.md).
+Their canonical source is the private plugin package, with repo discovery links
+under `.agents/skills`. Packaging and checks do not install or activate anything.
+
+## Historical tailnet relay build notes (2026-10-13)
+
+The following notes describe the earlier relay, not a current live-state readback.
 
 Code: `relay/relay.py` (MCP Streamable HTTP, stdlib only, SQLite WAL 0600), `relay/doorbell_listener.py` (tcp:8443),
 `relay/supervisor.sh` (watchdog-style 30 s loop), `relay/selftest.py`.

@@ -9,6 +9,14 @@
     "test": "node --test test/*.test.mjs",
     "check": "npm run typecheck && npm run build && npm test"
   },
-  "dependencies": { "jose": "^6.1.0" },
-  "devDependencies": { "@cloudflare/workers-types": "^4.20251101.0", "esbuild": "^0.25.0", "miniflare": "^4.20251101.0", "typescript": "^5.9.0" }
+  "dependencies": {
+    "jose": "^6.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251101.0",
+    "ajv": "8.17.1",
+    "esbuild": "^0.25.0",
+    "miniflare": "^4.20251101.0",
+    "typescript": "^5.9.0"
+  }
 }
